@@ -191,7 +191,10 @@ export function computeHourAvailability(
   const free = commonFreeForWindow(bookings, window);
   const freeCount = free.length;
   const maxContiguous = longestRun(free);
-  const separatedAt = maxContiguous < freeCount ? maxContiguous + 1 : null;
+  // separated_at holds the largest quantity that's still clean — the
+  // frontend warns when the requested quantity exceeds it (§3.3: "2 means
+  // requesting 1 or 2 courts is clean, but 3 would split").
+  const separatedAt = maxContiguous < freeCount ? maxContiguous : null;
   return { hour: startHour, freeCount, separatedAt };
 }
 

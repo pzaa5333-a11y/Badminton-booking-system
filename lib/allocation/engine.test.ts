@@ -129,6 +129,6 @@ describe("computeHourAvailability", () => {
     const existing = [booking({ startHour: 9, durationMinutes: 60, courtCount: 3, courtNumbers: [2, 3, 4] })];
     const availability = computeHourAvailability(existing, 9, 60);
     expect(availability.freeCount).toBe(2);
-    expect(availability.separatedAt).toBe(2); // requesting 1 is clean; 2 forces separation
+    expect(availability.separatedAt).toBe(1); // requesting 1 is clean; 2 forces separation
   });
 });
