@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { prisma, type DbClient } from "@/lib/db";
 import { isEffectivelyLocked } from "@/lib/allocation/lock";
 import { computeHourAvailability } from "@/lib/allocation/engine";
 import type { HourAvailability, PoolBooking } from "@/lib/allocation/types";
@@ -45,9 +45,10 @@ export function toPoolBooking(row: PoolBookingRow, now: Date): PoolBooking {
 export async function getPoolBookingsForDate(
   date: string,
   now: Date,
-  excludeId?: string
+  excludeId?: string,
+  client: DbClient = prisma
 ): Promise<PoolBooking[]> {
-  const rows = await prisma.booking.findMany({
+  const rows = await client.booking.findMany({
     where: {
       date,
       court: "pool",

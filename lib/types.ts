@@ -24,6 +24,9 @@ export const POOL_COURT_NUMBERS = [1, 2, 3, 4, 5] as const;
 export const POOL_SIZE = POOL_COURT_NUMBERS.length;
 export const COURT6 = 6 as const;
 
+/** §5: a booking's hold on its courts expires 15 minutes after acceptance if unpaid. */
+export const HOLD_DURATION_MINUTES = 15;
+
 export function hoursForDuration(durationMinutes: DurationMinutes): number {
   return durationMinutes / 60;
 }

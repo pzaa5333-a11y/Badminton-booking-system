@@ -1,5 +1,9 @@
-import { PrismaClient } from "@/generated/prisma/client";
+import { PrismaClient, Prisma } from "@/generated/prisma/client";
 import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+
+/** Accepted by any read/write helper that should also work inside
+ * prisma.$transaction(async (tx) => ...). */
+export type DbClient = PrismaClient | Prisma.TransactionClient;
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
