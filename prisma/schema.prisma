@@ -1,0 +1,57 @@
+// Prisma schema for Sevendays Badminton booking system.
+// SQLite in dev; swap the datasource url to Postgres for production.
+// SQLite has no native enum/scalar-list support, so status/court/court_numbers
+// are typed as String/Json here and constrained at the app layer (see lib/types.ts).
+
+datasource db {
+  provider = "sqlite"
+}
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+model Customer {
+  id         String   @id @default(cuid())
+  lineUserId String?  @unique @map("line_user_id")
+  name       String
+  phone      String
+  email      String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  bookings Booking[]
+
+  @@map("customers")
+}
+
+model Booking {
+  id       String   @id @default(cuid())
+  customer   Customer @relation(fields: [customerId], references: [id])
+  customerId String   @map("customer_id")
+
+  date             String // YYYY-MM-DD
+  startHour        Int    @map("start_hour") // 9-23, operating window 09:00-00:00
+  durationMinutes  Int    @map("duration_minutes") // 60 | 120 | 180 | 240
+  court            String // 'pool' | 'court6'
+  courtCount       Int    @default(1) @map("court_count") // meaningful only when court = 'pool'
+  courtNumbers     Json   @default("[]") @map("court_numbers") // assigned by allocation engine; always [6] for court6
+
+  status         String  @default("held") // held | paid | confirmed | released | cancelled
+  locked         Boolean @default(false)
+  gapPolicyFlag  Boolean @default(false) @map("gap_policy_flag") // set when §4.5.1 gap policy placed this booking non-ideally
+
+  holdExpiresAt DateTime? @map("hold_expires_at")
+  amountDue     Int       @map("amount_due") // THB, integer to avoid float rounding
+
+  slipImageUrl           String? @map("slip_image_url")
+  slipVerificationResult String? @map("slip_verification_result")
+
+  updatedBy String?  @map("updated_by") // admin identifier for manual actions
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([date, court])
+  @@index([customerId])
+  @@map("bookings")
+}
