@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { DurationMinutes } from "@/lib/types";
-import { defaultDateStrip, formatChipLabel, formatHourLabel, type DateChip } from "@/lib/client/dates";
+import { defaultDateStrip, formatChipLabel, type DateChip } from "@/lib/client/dates";
 import { fetchAvailability, fetchCourt6Availability, type AvailabilityHour } from "@/lib/client/api";
 import { DateStrip } from "./DateStrip";
 import { DurationSelector } from "./DurationSelector";
@@ -12,6 +13,7 @@ import { Court6Row } from "./Court6Row";
 import { RequestSheet, type SheetTarget } from "./RequestSheet";
 
 export function BookingPage() {
+  const router = useRouter();
   const baseChips = useMemo(() => defaultDateStrip(new Date()), []);
   const [extraChips, setExtraChips] = useState<DateChip[]>([]);
   const chips = [...baseChips, ...extraChips];
@@ -31,12 +33,6 @@ export function BookingPage() {
   const court6Errored = court6ErrorState?.key === selectedDate;
 
   const [sheetTarget, setSheetTarget] = useState<SheetTarget | null>(null);
-  const [confirmation, setConfirmation] = useState<{
-    court: string;
-    hour: number;
-    courtCount: number;
-    amountDue: number;
-  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -140,29 +136,9 @@ export function BookingPage() {
         onClose={() => setSheetTarget(null)}
         onSuccess={(info) => {
           setSheetTarget(null);
-          setConfirmation({ court: info.court, hour: info.hour, courtCount: info.courtCount, amountDue: info.amountDue });
+          router.push(`/booking/${info.bookingId}`);
         }}
       />
-
-      {confirmation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-xl dark:bg-neutral-900">
-            <p className="mb-1 text-lg font-semibold">Request received</p>
-            <p className="mb-4 text-sm text-neutral-500 dark:text-neutral-400">
-              {confirmation.court === "court6" ? "Court 6" : `${confirmation.courtCount} court${confirmation.courtCount > 1 ? "s" : ""}`} at{" "}
-              {formatHourLabel(confirmation.hour)}. Amount due: ฿{confirmation.amountDue}.
-            </p>
-            <p className="mb-4 text-xs text-neutral-500 dark:text-neutral-400">Payment step is coming soon — hold on to this.</p>
-            <button
-              type="button"
-              onClick={() => setConfirmation(null)}
-              className="w-full rounded-lg bg-emerald-600 py-2.5 font-semibold text-white"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

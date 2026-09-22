@@ -68,3 +68,52 @@ export async function submitBookingRequest(
   }
   return { ok: false, status: res.status, message: data.error ?? "Something went wrong. Please try again.", alternative: null };
 }
+
+export interface BookingDetail {
+  booking_id: string;
+  date: string;
+  start_hour: number;
+  duration_minutes: DurationMinutes;
+  court: CourtSelection;
+  court_count: number;
+  status: "held" | "paid" | "confirmed" | "released" | "cancelled";
+  hold_expires_at: string | null;
+  amount_due: number;
+  slip_image_url: string | null;
+  customer: { name: string; phone: string; email: string | null };
+}
+
+export async function fetchBookingDetail(bookingId: string): Promise<BookingDetail | null> {
+  const res = await fetch(`/api/bookings/${bookingId}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error("Failed to load booking");
+  return res.json();
+}
+
+export async function updateBookingEmail(bookingId: string, email: string): Promise<BookingDetail> {
+  const res = await fetch(`/api/bookings/${bookingId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) throw new Error("Failed to save email");
+  return res.json();
+}
+
+export interface SlipUploadResult {
+  ok: boolean;
+  verified?: boolean;
+  status?: BookingDetail["status"];
+  message?: string;
+}
+
+export async function uploadSlip(bookingId: string, file: File): Promise<SlipUploadResult> {
+  const formData = new FormData();
+  formData.append("slip", file);
+  const res = await fetch(`/api/bookings/${bookingId}/slip`, { method: "POST", body: formData });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return { ok: false, message: data.error ?? "Couldn't verify that slip. Please try again." };
+  }
+  return { ok: true, verified: data.verified, status: data.status };
+}
