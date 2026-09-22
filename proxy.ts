@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ADMIN_COOKIE_NAME, isValidAdminSession } from "@/lib/admin/auth";
 
-// Needs Node's crypto (HMAC) rather than the default Edge runtime.
-export const runtime = "nodejs";
-
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isAdminPage = pathname.startsWith("/admin") && pathname !== "/admin/login";
   const isAdminApi = pathname.startsWith("/api/admin") && pathname !== "/api/admin/login";
