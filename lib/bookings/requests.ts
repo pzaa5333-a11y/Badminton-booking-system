@@ -21,6 +21,10 @@ export interface BookingRequestInput {
   court: CourtSelection;
   customerName: string;
   customerPhone: string;
+  /** Admin walk-in (§6.3): skips the hold/payment flow, created paid/confirmed
+   * immediately, still runs through the same allocation engine. */
+  immediate?: boolean;
+  updatedBy?: string;
 }
 
 export type CreateBookingResult =
@@ -79,9 +83,10 @@ export async function createBookingRequest(input: BookingRequestInput): Promise<
           court: "court6",
           courtCount: 1,
           courtNumbers: [COURT6],
-          status: "held",
-          holdExpiresAt: new Date(now.getTime() + HOLD_DURATION_MINUTES * 60 * 1000),
+          status: input.immediate ? "confirmed" : "held",
+          holdExpiresAt: input.immediate ? null : new Date(now.getTime() + HOLD_DURATION_MINUTES * 60 * 1000),
           amountDue,
+          updatedBy: input.updatedBy,
         },
       });
       return { kind: "created", bookingId: booking.id, amountDue, gapPolicyFlag: false };
@@ -137,10 +142,11 @@ export async function createBookingRequest(input: BookingRequestInput): Promise<
         court: "pool",
         courtCount: input.courtCount,
         courtNumbers: placement.courtNumbers,
-        status: "held",
+        status: input.immediate ? "confirmed" : "held",
         gapPolicyFlag: placement.gapPolicyFlag,
-        holdExpiresAt: new Date(now.getTime() + HOLD_DURATION_MINUTES * 60 * 1000),
+        holdExpiresAt: input.immediate ? null : new Date(now.getTime() + HOLD_DURATION_MINUTES * 60 * 1000),
         amountDue,
+        updatedBy: input.updatedBy,
       },
     });
 
