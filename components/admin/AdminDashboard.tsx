@@ -13,8 +13,9 @@ import { ScheduleGrid } from "./ScheduleGrid";
 import { BookingActionsPanel } from "./BookingActionsPanel";
 import { WalkInForm } from "./WalkInForm";
 import { HistoryTable } from "./HistoryTable";
+import { MembersTab } from "./MembersTab";
 
-type Tab = "schedule" | "history";
+type Tab = "schedule" | "history" | "members";
 
 export function AdminDashboard() {
   const router = useRouter();
@@ -82,6 +83,13 @@ export function AdminDashboard() {
           >
             History
           </button>
+          <button
+            type="button"
+            onClick={() => setTab("members")}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium ${tab === "members" ? "bg-white shadow dark:bg-neutral-700" : ""}`}
+          >
+            Members
+          </button>
         </div>
 
         {tab === "schedule" && (
@@ -125,6 +133,8 @@ export function AdminDashboard() {
       )}
 
       {tab === "history" && <HistoryTable bookings={history} />}
+
+      {tab === "members" && <MembersTab />}
 
       {selectedBooking && (
         <BookingActionsPanel

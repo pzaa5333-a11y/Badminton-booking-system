@@ -94,3 +94,88 @@ export function markPaid(id: string) {
 export function setBookingLocked(id: string, locked: boolean) {
   return postAction(`/api/admin/bookings/${id}/lock`, { locked });
 }
+
+// --- Members / packages ---------------------------------------------------
+
+export interface AdminMember {
+  id: string;
+  username: string;
+  name: string;
+  phone: string;
+  activePackages: { id: string; packageTypeName: string; hoursRemaining: number; expiresAt: string }[];
+}
+
+export async function fetchMembers(): Promise<AdminMember[]> {
+  const res = await fetch("/api/admin/members");
+  if (!res.ok) throw new Error("Failed to load members");
+  const data = await res.json();
+  return data.members;
+}
+
+export interface AdminMemberDetail extends Omit<AdminMember, "activePackages"> {
+  packages: { id: string; packageTypeName: string; hoursRemaining: number; purchasedAt: string; expiresAt: string }[];
+  bookingsPaidFromPackages: { id: string; date: string; startHour: number; durationMinutes: number; court: string }[];
+}
+
+export async function fetchMemberDetail(id: string): Promise<AdminMemberDetail> {
+  const res = await fetch(`/api/admin/members/${id}`);
+  if (!res.ok) throw new Error("Failed to load member");
+  return res.json();
+}
+
+export async function createMember(payload: {
+  username: string;
+  password: string;
+  name: string;
+  phone: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  const res = await fetch("/api/admin/members", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return { ok: false, message: data.error ?? "Couldn't create member." };
+  return { ok: true };
+}
+
+export interface AdminPackageType {
+  id: string;
+  name: string;
+  hours: number;
+  validityDays: number;
+  price: number | null;
+}
+
+export async function fetchPackageTypes(): Promise<AdminPackageType[]> {
+  const res = await fetch("/api/admin/package-types");
+  if (!res.ok) throw new Error("Failed to load package types");
+  const data = await res.json();
+  return data.packageTypes.map((p: { id: string; name: string; hours: number; validityDays: number; price: number | null }) => ({
+    id: p.id,
+    name: p.name,
+    hours: p.hours,
+    validityDays: p.validityDays,
+    price: p.price,
+  }));
+}
+
+export async function createPackageType(payload: {
+  name: string;
+  hours: number;
+  validity_days: number;
+  price?: number;
+}): Promise<{ ok: boolean; message?: string }> {
+  const res = await fetch("/api/admin/package-types", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return { ok: false, message: data.error ?? "Couldn't create package type." };
+  return { ok: true };
+}
+
+export async function assignPackageToMember(memberId: string, packageTypeId: string) {
+  return postAction(`/api/admin/members/${memberId}/packages`, { package_type_id: packageTypeId });
+}

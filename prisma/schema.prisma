@@ -20,32 +20,87 @@ model Customer {
   email      String?
   createdAt  DateTime @default(now()) @map("created_at")
 
-  bookings Booking[]
+  // Membership (§ package system) — presence of `username` means this
+  // customer is also a member. Password is chosen by the customer; admin
+  // just keys it in. Hashed with scrypt + a per-user salt, never stored
+  // or logged in plain text (see lib/members/auth.ts).
+  username     String? @unique
+  passwordHash String? @map("password_hash")
+  passwordSalt String? @map("password_salt")
+
+  bookings       Booking[]
+  memberPackages MemberPackage[]
 
   @@map("customers")
 }
 
+/**
+ * Admin-defined package plan (e.g. "10 Hours") — creatable/editable in
+ * the admin panel, not hardcoded, since rates/offerings change.
+ */
+model PackageType {
+  id           String   @id @default(cuid())
+  name         String
+  hours        Int
+  validityDays Int      @map("validity_days")
+  price        Int? // THB, record-keeping only — packages are paid for off-platform
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  memberPackages MemberPackage[]
+
+  @@map("package_types")
+}
+
+/**
+ * One purchased/assigned package instance for a member. Admin creates
+ * these after the customer pays off-platform (LINE or in person).
+ */
+model MemberPackage {
+  id            String      @id @default(cuid())
+  customer      Customer    @relation(fields: [customerId], references: [id])
+  customerId    String      @map("customer_id")
+  packageType   PackageType @relation(fields: [packageTypeId], references: [id])
+  packageTypeId String      @map("package_type_id")
+
+  purchasedAt    DateTime @default(now()) @map("purchased_at")
+  expiresAt      DateTime @map("expires_at") // purchasedAt + packageType.validityDays, computed at creation
+  hoursRemaining Int      @map("hours_remaining")
+
+  updatedBy String?  @map("updated_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  bookings Booking[]
+
+  @@index([customerId])
+  @@map("member_packages")
+}
+
 model Booking {
-  id       String   @id @default(cuid())
+  id         String   @id @default(cuid())
   customer   Customer @relation(fields: [customerId], references: [id])
   customerId String   @map("customer_id")
 
-  date             String // YYYY-MM-DD
-  startHour        Int    @map("start_hour") // 9-23, operating window 09:00-00:00
-  durationMinutes  Int    @map("duration_minutes") // 60 | 120 | 180 | 240
-  court            String // 'pool' | 'court6'
-  courtCount       Int    @default(1) @map("court_count") // meaningful only when court = 'pool'
-  courtNumbers     Json   @default("[]") @map("court_numbers") // assigned by allocation engine; always [6] for court6
+  date            String // YYYY-MM-DD
+  startHour       Int    @map("start_hour") // 9-23, operating window 09:00-00:00
+  durationMinutes Int    @map("duration_minutes") // 60 | 120 | 180 | 240
+  court           String // 'pool' | 'court6'
+  courtCount      Int    @default(1) @map("court_count") // meaningful only when court = 'pool'
+  courtNumbers    Json   @default("[]") @map("court_numbers") // assigned by allocation engine; always [6] for court6
 
-  status         String  @default("held") // held | paid | confirmed | released | cancelled
-  locked         Boolean @default(false)
-  gapPolicyFlag  Boolean @default(false) @map("gap_policy_flag") // set when §4.5.1 gap policy placed this booking non-ideally
+  status        String  @default("held") // held | paid | confirmed | released | cancelled
+  locked        Boolean @default(false)
+  gapPolicyFlag Boolean @default(false) @map("gap_policy_flag") // set when §4.5.1 gap policy placed this booking non-ideally
 
   holdExpiresAt DateTime? @map("hold_expires_at")
   amountDue     Int       @map("amount_due") // THB, integer to avoid float rounding
 
   slipImageUrl           String? @map("slip_image_url")
   slipVerificationResult String? @map("slip_verification_result")
+
+  paymentMethod   String?        @map("payment_method") // 'promptpay' | 'package' | 'cash'
+  memberPackage   MemberPackage? @relation(fields: [memberPackageId], references: [id])
+  memberPackageId String?        @map("member_package_id") // which package this booking drew hours from, if paid that way
 
   updatedBy String?  @map("updated_by") // admin identifier for manual actions
   createdAt DateTime @default(now()) @map("created_at")
