@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "r
 import Link from "next/link";
 import { fetchBookingDetail, updateBookingEmail, uploadSlip, type BookingDetail } from "@/lib/client/api";
 import { formatHourLabel } from "@/lib/client/dates";
+import { PayWithPackageSection } from "./PayWithPackageSection";
 
 interface PaymentPageProps {
   bookingId: string;
@@ -184,8 +185,16 @@ export function PaymentPage({ bookingId }: PaymentPageProps) {
         {emailSaved && <p className="mt-1 text-xs text-emerald-600">Saved.</p>}
       </section>
 
+      <PayWithPackageSection
+        bookingId={bookingId}
+        onPaid={async () => {
+          const refreshed = await fetchBookingDetail(bookingId);
+          setBooking(refreshed);
+        }}
+      />
+
       <section className="mb-6 rounded-lg border border-neutral-200 p-4 text-center dark:border-neutral-800">
-        <h2 className="mb-3 text-sm font-semibold">Pay with PromptPay</h2>
+        <h2 className="mb-3 text-sm font-semibold">Or pay with PromptPay</h2>
         <div className="mx-auto mb-3 flex h-48 w-48 items-center justify-center rounded-lg border-2 border-dashed border-neutral-300 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900">
           <div className="px-4 text-center">
             <p className="text-xs text-neutral-400">PromptPay QR</p>

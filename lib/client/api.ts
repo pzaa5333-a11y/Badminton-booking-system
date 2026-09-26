@@ -117,3 +117,33 @@ export async function uploadSlip(bookingId: string, file: File): Promise<SlipUpl
   }
   return { ok: true, verified: data.verified, status: data.status };
 }
+
+export interface MemberSummary {
+  name: string;
+  packages: { id: string; packageTypeName: string; hoursRemaining: number; expiresAt: string }[];
+}
+
+/** Step 1 of "Pay with package" — no password needed, just confirms who this is. */
+export async function fetchMemberSummary(username: string): Promise<MemberSummary | null> {
+  const res = await fetch(`/api/members/${encodeURIComponent(username)}/summary`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error("Failed to load member");
+  return res.json();
+}
+
+export interface PayWithPackageResult {
+  ok: boolean;
+  message?: string;
+}
+
+/** Step 2 — the actual password-checked charge. */
+export async function payWithPackage(bookingId: string, username: string, password: string): Promise<PayWithPackageResult> {
+  const res = await fetch(`/api/bookings/${bookingId}/pay-with-package`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return { ok: false, message: data.error ?? "Couldn't complete payment. Please try again." };
+  return { ok: true };
+}
