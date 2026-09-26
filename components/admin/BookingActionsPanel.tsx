@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { cancelBooking, markPaid, overrideCourtNumbers, type AdminScheduleBooking } from "@/lib/client/admin-api";
+import { cancelBooking, markPaid, overrideCourtNumbers, setBookingLocked, type AdminScheduleBooking } from "@/lib/client/admin-api";
 import { formatHourLabel } from "@/lib/client/dates";
 
 interface BookingActionsPanelProps {
@@ -63,6 +63,20 @@ export function BookingActionsPanel({ booking, onClose, onChanged }: BookingActi
               Mark as paid
             </button>
           )}
+
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => run(() => setBookingLocked(booking.id, !booking.locked))}
+            className="w-full rounded-lg bg-neutral-100 py-2.5 font-semibold dark:bg-neutral-800 disabled:opacity-60"
+          >
+            {booking.locked ? "Unlock court" : "Lock court"}
+          </button>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400">
+            {booking.locked
+              ? "Unlocking clears a manual lock. If this booking is also within the automatic pre-start window, it'll still show as locked."
+              : "Locks this booking early, before the automatic 60-minutes-before-start cutoff — e.g. to keep a VIP's court from being reassigned by later bookings."}
+          </p>
 
           {booking.court === "pool" && (
             <div className="rounded-lg border border-neutral-200 p-3 dark:border-neutral-800">

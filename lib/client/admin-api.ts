@@ -90,3 +90,7 @@ export function overrideCourtNumbers(id: string, courtNumbers: number[]) {
 export function markPaid(id: string) {
   return postAction(`/api/admin/bookings/${id}/mark-paid`);
 }
+
+export function setBookingLocked(id: string, locked: boolean) {
+  return postAction(`/api/admin/bookings/${id}/lock`, { locked });
+}

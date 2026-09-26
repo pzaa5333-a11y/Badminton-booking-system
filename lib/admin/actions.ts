@@ -58,6 +58,22 @@ export async function overrideCourtNumbers(id: string, courtNumbers: number[], u
   return { ok: true };
 }
 
+/**
+ * Manual lock toggle: lets staff lock a booking before the automatic
+ * 60-minute-before-start cutoff (e.g. a VIP court they don't want touched
+ * even hours in advance). Unlocking only clears this manual flag — if the
+ * booking is still within the automatic cutoff window, it stays
+ * effectively locked regardless (isEffectivelyLocked ORs both), since that
+ * safety guarantee is never meant to be simply switched off.
+ */
+export async function setBookingLocked(id: string, locked: boolean, updatedBy: string): Promise<ActionResult> {
+  const booking = await prisma.booking.findUnique({ where: { id } });
+  if (!booking) return { ok: false, error: "Booking not found" };
+
+  await prisma.booking.update({ where: { id }, data: { locked, updatedBy } });
+  return { ok: true };
+}
+
 /** Payment override (§6.3): mark paid without slip verification — cash at
  * the counter, or resolving a verification dispute. */
 export async function markPaid(id: string, updatedBy: string): Promise<ActionResult> {

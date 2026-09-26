@@ -42,22 +42,22 @@ export function ScheduleGrid({ bookings, onSelectBooking }: ScheduleGridProps) {
       <table className="border-collapse text-xs">
         <thead>
           <tr>
-            <th className="sticky left-0 z-10 bg-white px-2 py-1.5 text-left dark:bg-neutral-950">Court</th>
-            {hours.map((h) => (
-              <th key={h} className="px-1 py-1.5 text-center font-normal text-neutral-500 dark:text-neutral-400">
-                {formatHourLabel(h)}
+            <th className="sticky left-0 z-10 bg-white px-2 py-1.5 text-left dark:bg-neutral-950">Time</th>
+            {COURTS.map((court) => (
+              <th key={court} className="px-1 py-1.5 text-center font-normal text-neutral-500 dark:text-neutral-400">
+                {court}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {COURTS.map((court) => (
-            <tr key={court}>
-              <td className="sticky left-0 z-10 bg-white px-2 py-1 font-medium dark:bg-neutral-950">{court}</td>
-              {hours.map((h) => {
+          {hours.map((h) => (
+            <tr key={h}>
+              <td className="sticky left-0 z-10 bg-white px-2 py-1 font-medium dark:bg-neutral-950">{formatHourLabel(h)}</td>
+              {COURTS.map((court) => {
                 const booking = cellMap.get(`${court}-${h}`);
                 return (
-                  <td key={h} className="p-0.5">
+                  <td key={court} className="p-0.5">
                     {booking ? (
                       <button
                         type="button"
