@@ -28,6 +28,7 @@ export async function getAdminScheduleForDate(date: string, now: Date = new Date
     customerName: r.customer.name,
     customerPhone: r.customer.phone,
     amountDue: r.amountDue,
+    paymentMethod: r.paymentMethod,
   }));
 }
 
@@ -53,6 +54,7 @@ export async function getBookingHistory(params: { limit?: number; date?: string 
     gapPolicyFlag: r.gapPolicyFlag,
     amountDue: r.amountDue,
     slipImageUrl: r.slipImageUrl,
+    paymentMethod: r.paymentMethod,
     customerName: r.customer.name,
     customerPhone: r.customer.phone,
     createdAt: r.createdAt.toISOString(),

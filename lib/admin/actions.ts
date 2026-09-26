@@ -83,6 +83,6 @@ export async function markPaid(id: string, updatedBy: string): Promise<ActionRes
     return { ok: false, error: `Booking is already ${booking.status}.` };
   }
 
-  await prisma.booking.update({ where: { id }, data: { status: "confirmed", updatedBy } });
+  await prisma.booking.update({ where: { id }, data: { status: "confirmed", paymentMethod: "cash", updatedBy } });
   return { ok: true };
 }

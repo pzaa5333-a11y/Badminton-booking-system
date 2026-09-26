@@ -86,6 +86,7 @@ export async function createBookingRequest(input: BookingRequestInput): Promise<
           status: input.immediate ? "confirmed" : "held",
           holdExpiresAt: input.immediate ? null : new Date(now.getTime() + HOLD_DURATION_MINUTES * 60 * 1000),
           amountDue,
+          paymentMethod: input.immediate ? "cash" : null,
           updatedBy: input.updatedBy,
         },
       });
@@ -146,12 +147,13 @@ export async function createBookingRequest(input: BookingRequestInput): Promise<
         gapPolicyFlag: placement.gapPolicyFlag,
         holdExpiresAt: input.immediate ? null : new Date(now.getTime() + HOLD_DURATION_MINUTES * 60 * 1000),
         amountDue,
+        paymentMethod: input.immediate ? "cash" : null,
         updatedBy: input.updatedBy,
       },
     });
 
     // Repack the whole date, not just this one booking: a fresh arrival
-    // gives repackDate's batch-aware lookahead (hasBiggerSuccessor) a
+    // gives repackDate's batch-aware lookahead (findLowEdgeReservation) a
     // chance to fire retroactively for *earlier* unlocked bookings too —
     // e.g. an earlier, smaller booking can now move to the far edge to
     // free the near edge for this new, bigger one, rather than leaving the

@@ -1,7 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { cancelBooking, markPaid, overrideCourtNumbers, setBookingLocked, type AdminScheduleBooking } from "@/lib/client/admin-api";
+import {
+  cancelBooking,
+  markPaid,
+  overrideCourtNumbers,
+  setBookingLocked,
+  paymentMethodLabel,
+  type AdminScheduleBooking,
+} from "@/lib/client/admin-api";
 import { formatHourLabel } from "@/lib/client/dates";
 
 interface BookingActionsPanelProps {
@@ -37,6 +44,7 @@ export function BookingActionsPanel({ booking, onClose, onChanged }: BookingActi
         <p className="mb-4 text-sm text-neutral-500 dark:text-neutral-400">
           {booking.court === "court6" ? "Court 6" : `Courts ${booking.courtNumbers.join(", ")}`} ·{" "}
           {formatHourLabel(booking.startHour)} · {booking.durationMinutes / 60}h · {booking.status}
+          {paymentMethodLabel(booking.paymentMethod) && ` · ${paymentMethodLabel(booking.paymentMethod)}`}
           {booking.locked && " · locked"}
           {booking.gapPolicyFlag && " · flagged (gap policy)"}
         </p>

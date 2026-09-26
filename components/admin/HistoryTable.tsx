@@ -1,4 +1,4 @@
-import type { AdminHistoryBooking } from "@/lib/client/admin-api";
+import { paymentMethodLabel, type AdminHistoryBooking } from "@/lib/client/admin-api";
 import { formatHourLabel } from "@/lib/client/dates";
 
 interface HistoryTableProps {
@@ -24,6 +24,7 @@ export function HistoryTable({ bookings }: HistoryTableProps) {
           <p className="text-xs text-neutral-500 dark:text-neutral-400">
             {b.date} · {formatHourLabel(b.startHour)} · {b.durationMinutes / 60}h ·{" "}
             {b.court === "court6" ? "Court 6" : `${b.courtCount} court${b.courtCount > 1 ? "s" : ""}`} · ฿{b.amountDue}
+            {paymentMethodLabel(b.paymentMethod) && ` · ${paymentMethodLabel(b.paymentMethod)}`}
           </p>
           <p className="text-xs text-neutral-500 dark:text-neutral-400">{b.customerPhone}</p>
           {b.slipImageUrl && (

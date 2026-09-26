@@ -1,5 +1,16 @@
 import type { CourtSelection, DurationMinutes } from "@/lib/types";
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  promptpay: "PromptPay",
+  package: "Package",
+  cash: "Cash",
+};
+
+export function paymentMethodLabel(method: string | null): string | null {
+  if (!method) return null;
+  return PAYMENT_METHOD_LABELS[method] ?? method;
+}
+
 export interface AdminScheduleBooking {
   id: string;
   court: CourtSelection;
@@ -12,6 +23,7 @@ export interface AdminScheduleBooking {
   customerName: string;
   customerPhone: string;
   amountDue: number;
+  paymentMethod: string | null;
 }
 
 export async function fetchAdminSchedule(date: string): Promise<AdminScheduleBooking[]> {
@@ -33,6 +45,7 @@ export interface AdminHistoryBooking {
   gapPolicyFlag: boolean;
   amountDue: number;
   slipImageUrl: string | null;
+  paymentMethod: string | null;
   customerName: string;
   customerPhone: string;
   createdAt: string;
