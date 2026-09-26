@@ -75,22 +75,27 @@ function longestRun(free: number[]): number {
  * of the requested length exists (caller falls back to the gap policy).
  *
  * When `free` spans the entire pool (nothing at all occupies this window)
- * there's a real choice of which edge to anchor to — that's the
- * "batch-aware" hook (§4.4): `preferHighEdge` reserves the low courts for a
- * bigger booking already known to start right when this one ends. In every
- * other (normal) case `free` is a single run touching exactly one edge of
- * the pool, and the only placement that keeps the "one booked run, one free
- * run" invariant (§4.3) is immediately adjacent to the existing booked
- * block — so there's no real choice, and `preferHighEdge` is moot.
+ * there's a real choice of where to anchor — that's the "batch-aware" hook
+ * (§4.4): `reserveLowSlots` leaves that many courts at the low edge
+ * untouched, for another known booking that overlaps this window and
+ * outlasts it (see `findLowEdgeReservation`) to claim as ITS low-anchored
+ * block once this one ends. In every other (normal) case `free` is a
+ * single run touching exactly one edge of the pool, and the only placement
+ * that keeps the "one booked run, one free run" invariant (§4.3) is
+ * immediately adjacent to the existing booked block — so there's no real
+ * choice, and `reserveLowSlots` is moot.
  */
-function chooseCourtRun(free: number[], courtCount: number, preferHighEdge: boolean): number[] | null {
+function chooseCourtRun(free: number[], courtCount: number, reserveLowSlots: number): number[] | null {
   const runs = contiguousRuns(free);
   const candidates = runs.filter((r) => r.length >= courtCount).sort((a, b) => a[0] - b[0]);
   if (candidates.length === 0) return null;
 
   if (free.length === POOL_SIZE) {
     const run = candidates[0]; // the whole pool, as one run
-    return preferHighEdge ? run.slice(run.length - courtCount) : run.slice(0, courtCount);
+    if (reserveLowSlots > 0 && reserveLowSlots + courtCount <= POOL_SIZE) {
+      return run.slice(reserveLowSlots, reserveLowSlots + courtCount);
+    }
+    return run.slice(0, courtCount);
   }
 
   // Lowest-positioned run big enough. The normal case has exactly one
@@ -113,9 +118,43 @@ function chooseCourtRun(free: number[], courtCount: number, preferHighEdge: bool
   return run.slice(0, courtCount);
 }
 
-function hasBiggerSuccessor(request: NewBookingWindow, others: PoolBooking[]): boolean {
-  const endHour = request.startHour + request.durationMinutes / 60;
-  return others.some((b) => b.startHour === endHour && b.courtCount > request.courtCount);
+/**
+ * True if `other` actually shares an hour with `request`'s window (not
+ * just touches — a booking starting exactly when this one ends never
+ * coexists with it, so there's never a real court conflict between them
+ * regardless of position, and reserving for it would be pure overhead) and
+ * keeps running past `request`'s own end.
+ */
+function overlapsAndOutlasts(request: NewBookingWindow, other: PoolBooking): boolean {
+  const myEnd = request.startHour + request.durationMinutes / 60;
+  const otherEnd = other.startHour + other.durationMinutes / 60;
+  if (otherEnd <= myEnd) return false;
+
+  const myWindow = bookingHourWindow(request.startHour, request.durationMinutes);
+  const otherWindow = bookingHourWindow(other.startHour, other.durationMinutes);
+  return myWindow.some((h) => otherWindow.includes(h));
+}
+
+/**
+ * How many courts, at the low edge, this booking should leave untouched
+ * for another known booking to claim (§4.4's batch-awareness, generalized
+ * beyond the narrow "starts exactly when I end" case): a booking that's
+ * genuinely simultaneously active with this one for at least one hour, and
+ * keeps running after this one ends, will want a clean low-anchored block
+ * once this one vacates — so this booking steps aside by exactly that many
+ * courts. When several such bookings exist, reserves for the largest (a
+ * conservative approximation, not an exact multi-booking reservation).
+ * Bookings that merely touch (back-to-back, no shared hour) are excluded —
+ * they never coexist with this one, so no reservation is needed for them.
+ */
+function findLowEdgeReservation(request: NewBookingWindow, others: PoolBooking[]): number {
+  let reservation = 0;
+  for (const other of others) {
+    if (overlapsAndOutlasts(request, other)) {
+      reservation = Math.max(reservation, other.courtCount);
+    }
+  }
+  return reservation;
 }
 
 // ---------------------------------------------------------------------------
@@ -137,8 +176,8 @@ export function placeBooking(
   const free = commonFreeForWindow(existingBookings, window);
 
   if (free.length >= request.courtCount) {
-    const preferHighEdge = hasBiggerSuccessor(request, [...existingBookings, ...(options.lookahead ?? [])]);
-    const run = chooseCourtRun(free, request.courtCount, preferHighEdge);
+    const reserveLowSlots = findLowEdgeReservation(request, [...existingBookings, ...(options.lookahead ?? [])]);
+    const run = chooseCourtRun(free, request.courtCount, reserveLowSlots);
     if (run) return { status: "placed", courtNumbers: run, gapPolicyFlag: false };
   }
 
@@ -152,7 +191,7 @@ export function placeBooking(
   // manually-reviewed last resort, not silent behavior.
   const fallbackSize = longestRun(free);
   if (fallbackSize === 0) return { status: "infeasible" };
-  const run = chooseCourtRun(free, fallbackSize, false) ?? [];
+  const run = chooseCourtRun(free, fallbackSize, 0) ?? [];
   return { status: "gap-policy", courtNumbers: run, gapPolicyFlag: true };
 }
 
@@ -171,7 +210,7 @@ export function findFeasibleStart(
   for (let start = request.startHour + 1; start + hours <= CLOSING_HOUR; start++) {
     const window = bookingHourWindow(start, request.durationMinutes);
     const free = commonFreeForWindow(existingBookings, window);
-    if (free.length >= request.courtCount && chooseCourtRun(free, request.courtCount, false)) {
+    if (free.length >= request.courtCount && chooseCourtRun(free, request.courtCount, 0)) {
       return start;
     }
   }

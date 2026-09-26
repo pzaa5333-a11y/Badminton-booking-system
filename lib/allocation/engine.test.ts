@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { placeBooking, findFeasibleStart, repackDate, computeHourAvailability } from "./engine";
+import { placeBooking, findFeasibleStart, repackDate, computeHourAvailability, commonFreeForWindow } from "./engine";
 import type { PoolBooking } from "./types";
 
 let nextId = 0;
@@ -40,26 +40,84 @@ describe("placeBooking — normal edge-first placement", () => {
 });
 
 describe("placeBooking — batch-aware edge reservation", () => {
-  it("places a short booking at the far edge when a bigger booking is known to start right after", () => {
-    const shortBooking = { startHour: 9, durationMinutes: 60, courtCount: 1 };
-    const biggerSuccessor = booking({ startHour: 10, durationMinutes: 180, courtCount: 3, courtNumbers: [] });
+  it("reserves exactly enough low-edge courts for a bigger booking that genuinely overlaps and outlasts it", () => {
+    const shortBooking = { startHour: 9, durationMinutes: 120, courtCount: 1 }; // hours 9,10
+    const biggerOverlapper = booking({ startHour: 10, durationMinutes: 180, courtCount: 3, courtNumbers: [] }); // hours 10,11,12 — shares hour 10
 
-    const shortResult = placeBooking(shortBooking, [], { lookahead: [biggerSuccessor] });
-    expect(shortResult).toEqual({ status: "placed", courtNumbers: [5], gapPolicyFlag: false });
-
-    // Placing the short booking at the far edge left the low courts clear, so
-    // the bigger booking gets a clean contiguous block when it's placed for real.
-    const placedShort = booking({ ...shortBooking, courtNumbers: shortResult.status === "placed" ? shortResult.courtNumbers : [] });
-    const biggerResult = placeBooking(
-      { startHour: 10, durationMinutes: 180, courtCount: 3 },
-      [placedShort]
-    );
-    expect(biggerResult).toEqual({ status: "placed", courtNumbers: [1, 2, 3], gapPolicyFlag: false });
+    const shortResult = placeBooking(shortBooking, [], { lookahead: [biggerOverlapper] });
+    // Reserves courts 1–3 for the overlapper's own courtCount (3), so the
+    // short booking steps in to court 4 rather than claiming the low edge.
+    expect(shortResult).toEqual({ status: "placed", courtNumbers: [4], gapPolicyFlag: false });
   });
 
-  it("defaults to the low edge when no bigger successor is known", () => {
+  it("needs no reservation for a booking that merely touches (starts when this one ends) — they never coexist", () => {
+    const shortBooking = { startHour: 9, durationMinutes: 60, courtCount: 1 }; // hour 9 only
+    const backToBackSuccessor = booking({ startHour: 10, durationMinutes: 180, courtCount: 3, courtNumbers: [] }); // starts right after, never overlaps
+
+    const shortResult = placeBooking(shortBooking, [], { lookahead: [backToBackSuccessor] });
+    expect(shortResult).toEqual({ status: "placed", courtNumbers: [1], gapPolicyFlag: false });
+
+    // No reservation was needed: the successor still gets a clean block
+    // when placed for real, since it was never actually competing with the
+    // short booking for the same hour.
+    const placedShort = booking({ ...shortBooking, courtNumbers: shortResult.status === "placed" ? shortResult.courtNumbers : [] });
+    const successorResult = placeBooking({ startHour: 10, durationMinutes: 180, courtCount: 3 }, [placedShort]);
+    expect(successorResult).toEqual({ status: "placed", courtNumbers: [1, 2, 3], gapPolicyFlag: false });
+  });
+
+  it("defaults to the low edge when no overlapping-and-outlasting booking is known", () => {
     const result = placeBooking({ startHour: 9, durationMinutes: 60, courtCount: 1 }, []);
     expect(result).toEqual({ status: "placed", courtNumbers: [1], gapPolicyFlag: false });
+  });
+
+  it("reserves the low edge for a booking that overlaps mid-window (not just a back-to-back successor)", () => {
+    // P: hours 9-10 (2h, 1 court). O: hours 10-12 (3h, 1 court) — they
+    // share hour 10 and O outlasts P, so P should step aside for O even
+    // though O doesn't merely start when P ends (they actually overlap).
+    // I: hour 11 only (2 courts) — once P has vacated, I needs a clean
+    // contiguous pair. This mirrors real reported behavior: booking a
+    // short session, then a longer overlapping one, then a third session
+    // once the first has ended.
+    const p = booking({ id: "p", startHour: 9, durationMinutes: 120, courtCount: 1, priority: 1 });
+    const o = booking({ id: "o", startHour: 10, durationMinutes: 180, courtCount: 1, priority: 2 });
+    const i = booking({ id: "i", startHour: 11, durationMinutes: 60, courtCount: 2, priority: 3 });
+
+    // Place P first (knowing O and I are coming), then O, then I — exactly
+    // as createBookingRequest's repack-after-create does in practice.
+    const pResult = placeBooking(
+      { startHour: p.startHour, durationMinutes: p.durationMinutes, courtCount: p.courtCount },
+      [],
+      { lookahead: [o, i] }
+    );
+    expect(pResult.status).toBe("placed");
+    const placedP = { ...p, courtNumbers: pResult.status === "placed" ? pResult.courtNumbers : [] };
+
+    const oResult = placeBooking(
+      { startHour: o.startHour, durationMinutes: o.durationMinutes, courtCount: o.courtCount },
+      [placedP],
+      { lookahead: [i] }
+    );
+    expect(oResult.status).toBe("placed");
+    const placedO = { ...o, courtNumbers: oResult.status === "placed" ? oResult.courtNumbers : [] };
+
+    const iResult = placeBooking(
+      { startHour: i.startHour, durationMinutes: i.durationMinutes, courtCount: i.courtCount },
+      [placedP, placedO]
+    );
+    // The real requirement isn't which exact court numbers land where —
+    // it's that I ends up with a genuinely contiguous pair, not split
+    // across an island left behind by P and O's placement.
+    expect(iResult.status).toBe("placed");
+    if (iResult.status === "placed") {
+      expect(iResult.courtNumbers).toEqual([iResult.courtNumbers[0], iResult.courtNumbers[0] + 1]);
+
+      // And the courts NOT taken by I are still free and contiguous too —
+      // the original report: 2 courts free at that hour, but stranded
+      // apart instead of sitting next to each other.
+      const placedI = { ...i, courtNumbers: iResult.courtNumbers };
+      const stillFree = commonFreeForWindow([placedP, placedO, placedI], [11]);
+      expect(stillFree).toEqual([stillFree[0], stillFree[0] + 1]);
+    }
   });
 });
 

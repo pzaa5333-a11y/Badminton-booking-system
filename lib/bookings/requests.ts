@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { findOrCreateCustomer } from "./customers";
 import { getPoolBookingsForDate } from "./pool";
 import { getCourt6BusyHours } from "./court6";
-import { placeBooking, findFeasibleStart } from "@/lib/allocation/engine";
+import { placeBooking, findFeasibleStart, repackDate } from "@/lib/allocation/engine";
 import {
   bookingHourWindow,
   CLOSING_HOUR,
@@ -150,6 +150,30 @@ export async function createBookingRequest(input: BookingRequestInput): Promise<
       },
     });
 
-    return { kind: "created", bookingId: booking.id, amountDue, gapPolicyFlag: placement.gapPolicyFlag };
+    // Repack the whole date, not just this one booking: a fresh arrival
+    // gives repackDate's batch-aware lookahead (hasBiggerSuccessor) a
+    // chance to fire retroactively for *earlier* unlocked bookings too —
+    // e.g. an earlier, smaller booking can now move to the far edge to
+    // free the near edge for this new, bigger one, rather than leaving the
+    // pool fragmented until someone happens to cancel something.
+    const allForDate = await getPoolBookingsForDate(input.date, now, undefined, tx);
+    const repackChanges = repackDate(allForDate);
+    for (const change of repackChanges) {
+      // The new booking is processed last in repackDate's priority order,
+      // so its own placement can also differ from the one-shot result
+      // above once earlier bookings have potentially shifted — apply it too.
+      await tx.booking.update({
+        where: { id: change.id },
+        data: { courtNumbers: change.courtNumbers, gapPolicyFlag: change.gapPolicyFlag },
+      });
+    }
+    const finalPlacement = repackChanges.find((c) => c.id === booking.id);
+
+    return {
+      kind: "created",
+      bookingId: booking.id,
+      amountDue,
+      gapPolicyFlag: finalPlacement?.gapPolicyFlag ?? placement.gapPolicyFlag,
+    };
   });
 }
