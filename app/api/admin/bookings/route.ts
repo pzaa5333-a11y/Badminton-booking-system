@@ -5,14 +5,21 @@ import { createBookingRequest } from "@/lib/bookings/requests";
 import { dateSchema, durationSchema, nameSchema, phoneSchema } from "@/lib/validation";
 import { CLOSING_HOUR, OPENING_HOUR, POOL_SIZE, type DurationMinutes } from "@/lib/types";
 
+const monthSchema = z.string().regex(/^\d{4}-\d{2}$/, "Invalid month");
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const date = searchParams.get("date");
+  const month = searchParams.get("month");
   if (date) {
     const parsed = dateSchema.safeParse(date);
     if (!parsed.success) return NextResponse.json({ error: "Invalid date" }, { status: 400 });
   }
-  const bookings = await getBookingHistory({ date: date ?? undefined });
+  if (month) {
+    const parsed = monthSchema.safeParse(month);
+    if (!parsed.success) return NextResponse.json({ error: "Invalid month" }, { status: 400 });
+  }
+  const bookings = await getBookingHistory({ date: date ?? undefined, month: month ?? undefined, limit: month ? 500 : undefined });
   return NextResponse.json({ bookings });
 }
 

@@ -131,6 +131,15 @@ export async function fetchMemberSummary(username: string): Promise<MemberSummar
   return res.json();
 }
 
+/** The admin-uploaded QR image customers scan to pay (§ payment page
+ * redesign — replaces the old PromptPay placeholder). Public, no auth. */
+export async function fetchPaymentQrUrl(): Promise<string | null> {
+  const res = await fetch("/api/payment-settings");
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.qr_image_url ?? null;
+}
+
 export interface PayWithPackageResult {
   ok: boolean;
   message?: string;

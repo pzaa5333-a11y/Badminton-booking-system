@@ -41,6 +41,7 @@ export async function payBookingWithPackage(
     where: {
       customerId: customer.id,
       expiresAt: { gt: new Date() },
+      revoked: false,
       hoursRemaining: { gte: hoursNeeded },
     },
     orderBy: { expiresAt: "asc" },

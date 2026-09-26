@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import Link from "next/link";
-import { fetchBookingDetail, updateBookingEmail, uploadSlip, type BookingDetail } from "@/lib/client/api";
+import { fetchBookingDetail, fetchPaymentQrUrl, updateBookingEmail, uploadSlip, type BookingDetail } from "@/lib/client/api";
 import { formatHourLabel } from "@/lib/client/dates";
 import { PayWithPackageSection } from "./PayWithPackageSection";
+import { BookingSummaryCard } from "./BookingSummaryCard";
 
 interface PaymentPageProps {
   bookingId: string;
@@ -39,6 +40,9 @@ export function PaymentPage({ bookingId }: PaymentPageProps) {
   const [emailSaved, setEmailSaved] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [slipFile, setSlipFile] = useState<File | null>(null);
+  const [slipPreviewUrl, setSlipPreviewUrl] = useState<string | null>(null);
+  const [qrImageUrl, setQrImageUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -50,6 +54,9 @@ export function PaymentPage({ bookingId }: PaymentPageProps) {
       .catch(() => {
         if (!cancelled) setLoadFailed(true);
       });
+    fetchPaymentQrUrl().then((url) => {
+      if (!cancelled) setQrImageUrl(url);
+    });
     return () => {
       cancelled = true;
     };
@@ -66,16 +73,29 @@ export function PaymentPage({ bookingId }: PaymentPageProps) {
     setEmailSaved(true);
   }
 
-  async function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
+  function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
+    setUploadError(null);
+    setSlipFile(file);
+    setSlipPreviewUrl(URL.createObjectURL(file));
+  }
+
+  function handleChooseDifferentPhoto() {
+    setSlipFile(null);
+    setSlipPreviewUrl(null);
+    setUploadError(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  async function handleConfirmSlip() {
+    if (!slipFile) return;
     setUploading(true);
     setUploadError(null);
-    const result = await uploadSlip(bookingId, file);
+    const result = await uploadSlip(bookingId, slipFile);
     setUploading(false);
     if (!result.ok) {
       setUploadError(result.message ?? "Upload failed. Please try again.");
-      if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
     const refreshed = await fetchBookingDetail(bookingId);
@@ -146,12 +166,17 @@ export function PaymentPage({ bookingId }: PaymentPageProps) {
 
   return (
     <div className="mx-auto w-full max-w-md px-4 pt-6 pb-16">
-      <header className="mb-6">
+      <header className="mb-4">
         <h1 className="text-xl font-bold">Complete your booking</h1>
-        <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-          {courtLabel} · {booking.date} · {formatHourLabel(booking.start_hour)} · {booking.duration_minutes / 60}h
-        </p>
       </header>
+
+      <BookingSummaryCard
+        date={booking.date}
+        startHour={booking.start_hour}
+        durationMinutes={booking.duration_minutes}
+        courtLabel={courtLabel}
+        amountDue={booking.amount_due}
+      />
 
       {msLeft !== null && (
         <div className="mb-6 rounded-lg bg-amber-50 px-4 py-3 text-center dark:bg-amber-950">
@@ -187,6 +212,14 @@ export function PaymentPage({ bookingId }: PaymentPageProps) {
 
       <PayWithPackageSection
         bookingId={bookingId}
+        summary={{
+          date: booking.date,
+          startHour: booking.start_hour,
+          durationMinutes: booking.duration_minutes,
+          courtCount: booking.court_count,
+          courtLabel,
+          amountDue: booking.amount_due,
+        }}
         onPaid={async () => {
           const refreshed = await fetchBookingDetail(bookingId);
           setBooking(refreshed);
@@ -194,27 +227,59 @@ export function PaymentPage({ bookingId }: PaymentPageProps) {
       />
 
       <section className="mb-6 rounded-lg border border-neutral-200 p-4 text-center dark:border-neutral-800">
-        <h2 className="mb-3 text-sm font-semibold">Or pay with PromptPay</h2>
-        <div className="mx-auto mb-3 flex h-48 w-48 items-center justify-center rounded-lg border-2 border-dashed border-neutral-300 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900">
-          <div className="px-4 text-center">
-            <p className="text-xs text-neutral-400">PromptPay QR</p>
-            <p className="mt-1 text-xs text-neutral-400">(placeholder — real QR coming soon)</p>
+        <h2 className="mb-3 text-sm font-semibold">Or scan to pay</h2>
+        {qrImageUrl ? (
+          <img src={qrImageUrl} alt="Payment QR code" className="mx-auto mb-3 h-48 w-48 rounded-lg object-contain" />
+        ) : (
+          <div className="mx-auto mb-3 flex h-48 w-48 items-center justify-center rounded-lg border-2 border-dashed border-neutral-300 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900">
+            <p className="px-4 text-center text-xs text-neutral-400">QR not set up yet — please contact us.</p>
           </div>
-        </div>
+        )}
         <p className="text-lg font-semibold">฿{booking.amount_due}</p>
       </section>
 
       <section className="mb-6 rounded-lg border border-neutral-200 p-4 dark:border-neutral-800">
         <h2 className="mb-3 text-sm font-semibold">Upload payment slip</h2>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/heic"
-          onChange={handleFileChange}
-          disabled={uploading}
-          className="block w-full text-sm"
-        />
-        {uploading && <p className="mt-2 text-sm text-neutral-500 dark:text-neutral-400">Verifying…</p>}
+
+        {!slipPreviewUrl ? (
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/heic"
+            onChange={handleFileChange}
+            disabled={uploading}
+            className="block w-full text-sm"
+          />
+        ) : (
+          <div>
+            <img src={slipPreviewUrl} alt="Slip preview" className="mb-3 max-h-64 w-full rounded-lg border border-neutral-200 object-contain dark:border-neutral-800" />
+            <BookingSummaryCard
+              date={booking.date}
+              startHour={booking.start_hour}
+              durationMinutes={booking.duration_minutes}
+              courtLabel={courtLabel}
+              amountDue={booking.amount_due}
+            />
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={uploading}
+                onClick={handleConfirmSlip}
+                className="flex-1 rounded-lg bg-emerald-600 py-2.5 font-semibold text-white disabled:opacity-60"
+              >
+                {uploading ? "Submitting…" : "Confirm and submit"}
+              </button>
+              <button
+                type="button"
+                disabled={uploading}
+                onClick={handleChooseDifferentPhoto}
+                className="rounded-lg bg-neutral-100 px-3 py-2.5 text-sm font-medium dark:bg-neutral-800"
+              >
+                Choose a different photo
+              </button>
+            </div>
+          </div>
+        )}
         {uploadError && <p className="mt-2 text-sm text-red-600">{uploadError}</p>}
       </section>
     </div>

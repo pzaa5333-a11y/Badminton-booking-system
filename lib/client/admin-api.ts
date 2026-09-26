@@ -1,7 +1,8 @@
 import type { CourtSelection, DurationMinutes } from "@/lib/types";
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  promptpay: "PromptPay",
+  transfer: "Bank Transfer",
+  promptpay: "Bank Transfer", // legacy value from before the QR redesign
   package: "Package",
   cash: "Cash",
 };
@@ -11,7 +12,11 @@ export function paymentMethodLabel(method: string | null): string | null {
   return PAYMENT_METHOD_LABELS[method] ?? method;
 }
 
-export interface AdminScheduleBooking {
+/** Fields every admin booking listing shares — the shape
+ * `BookingActionsPanel` (lib/client/admin-api.ts's callers in
+ * components/admin/) is built against, so the same popup works whether the
+ * booking came from the Schedule grid or the Bookings tab. */
+export interface AdminBookingRow {
   id: string;
   court: CourtSelection;
   courtNumbers: number[];
@@ -20,11 +25,17 @@ export interface AdminScheduleBooking {
   status: string;
   locked: boolean;
   gapPolicyFlag: boolean;
+  needsAttention: boolean;
+  cancelledAt: string | null;
   customerName: string;
   customerPhone: string;
   amountDue: number;
   paymentMethod: string | null;
+  slipImageUrl: string | null;
+  createdAt: string;
 }
+
+export type AdminScheduleBooking = AdminBookingRow;
 
 export async function fetchAdminSchedule(date: string): Promise<AdminScheduleBooking[]> {
   const res = await fetch(`/api/admin/schedule?date=${date}`);
@@ -33,22 +44,9 @@ export async function fetchAdminSchedule(date: string): Promise<AdminScheduleBoo
   return data.bookings;
 }
 
-export interface AdminHistoryBooking {
-  id: string;
+export interface AdminHistoryBooking extends AdminBookingRow {
   date: string;
-  startHour: number;
-  durationMinutes: number;
-  court: CourtSelection;
   courtCount: number;
-  courtNumbers: number[];
-  status: string;
-  gapPolicyFlag: boolean;
-  amountDue: number;
-  slipImageUrl: string | null;
-  paymentMethod: string | null;
-  customerName: string;
-  customerPhone: string;
-  createdAt: string;
   updatedBy: string | null;
 }
 
@@ -56,6 +54,28 @@ export async function fetchAdminHistory(date?: string): Promise<AdminHistoryBook
   const url = date ? `/api/admin/bookings?date=${date}` : "/api/admin/bookings";
   const res = await fetch(url);
   if (!res.ok) throw new Error("Failed to load history");
+  const data = await res.json();
+  return data.bookings;
+}
+
+export async function fetchAdminBookingsForMonth(month: string): Promise<AdminHistoryBooking[]> {
+  const res = await fetch(`/api/admin/bookings?month=${month}`);
+  if (!res.ok) throw new Error("Failed to load bookings");
+  const data = await res.json();
+  return data.bookings;
+}
+
+export interface RecentBooking {
+  id: string;
+  date: string;
+  startHour: number;
+  customerName: string;
+  createdAt: string;
+}
+
+export async function fetchRecentBookings(since: string): Promise<RecentBooking[]> {
+  const res = await fetch(`/api/admin/notifications?since=${encodeURIComponent(since)}`);
+  if (!res.ok) throw new Error("Failed to load notifications");
   const data = await res.json();
   return data.bookings;
 }
@@ -108,6 +128,14 @@ export function setBookingLocked(id: string, locked: boolean) {
   return postAction(`/api/admin/bookings/${id}/lock`, { locked });
 }
 
+export function restoreBooking(id: string) {
+  return postAction(`/api/admin/bookings/${id}/restore`);
+}
+
+export function swapCourtNumbers(id: string, otherBookingId: string) {
+  return postAction(`/api/admin/bookings/${id}/swap-courts`, { other_booking_id: otherBookingId });
+}
+
 // --- Members / packages ---------------------------------------------------
 
 export interface AdminMember {
@@ -126,7 +154,14 @@ export async function fetchMembers(): Promise<AdminMember[]> {
 }
 
 export interface AdminMemberDetail extends Omit<AdminMember, "activePackages"> {
-  packages: { id: string; packageTypeName: string; hoursRemaining: number; purchasedAt: string; expiresAt: string }[];
+  packages: {
+    id: string;
+    packageTypeName: string;
+    hoursRemaining: number;
+    purchasedAt: string;
+    expiresAt: string;
+    revoked: boolean;
+  }[];
   bookingsPaidFromPackages: { id: string; date: string; startHour: number; durationMinutes: number; court: string }[];
 }
 
@@ -191,4 +226,30 @@ export async function createPackageType(payload: {
 
 export async function assignPackageToMember(memberId: string, packageTypeId: string) {
   return postAction(`/api/admin/members/${memberId}/packages`, { package_type_id: packageTypeId });
+}
+
+export function revokeMemberPackage(memberId: string, packageId: string) {
+  return postAction(`/api/admin/members/${memberId}/packages/${packageId}/revoke`);
+}
+
+export function setMemberPackageHours(memberId: string, packageId: string, hoursRemaining: number) {
+  return postAction(`/api/admin/members/${memberId}/packages/${packageId}/hours`, { hours_remaining: hoursRemaining });
+}
+
+// --- Payment settings (QR image) -------------------------------------------
+
+export async function fetchAdminPaymentQrUrl(): Promise<string | null> {
+  const res = await fetch("/api/admin/payment-settings");
+  if (!res.ok) throw new Error("Failed to load payment settings");
+  const data = await res.json();
+  return data.qr_image_url ?? null;
+}
+
+export async function uploadPaymentQr(file: File): Promise<{ ok: boolean; message?: string; qrImageUrl?: string }> {
+  const formData = new FormData();
+  formData.append("qr_image", file);
+  const res = await fetch("/api/admin/payment-settings", { method: "POST", body: formData });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return { ok: false, message: data.error ?? "Couldn't upload image." };
+  return { ok: true, qrImageUrl: data.qr_image_url };
 }

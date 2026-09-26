@@ -62,9 +62,21 @@ export function ScheduleGrid({ bookings, onSelectBooking }: ScheduleGridProps) {
                       <button
                         type="button"
                         onClick={() => onSelectBooking(booking)}
-                        className={`w-16 truncate rounded px-1 py-1.5 text-left ${statusClass(booking.status, booking.gapPolicyFlag)}`}
-                        title={`${booking.customerName} · ${booking.status}`}
+                        className={`relative w-16 truncate rounded px-1 py-1.5 text-left ${statusClass(booking.status, booking.gapPolicyFlag)}`}
+                        title={`${booking.customerName} · ${booking.status}${booking.locked ? " · locked" : ""}`}
                       >
+                        {booking.locked && (
+                          <svg
+                            viewBox="0 0 12 12"
+                            className="absolute right-0.5 top-0.5 h-2.5 w-2.5 opacity-70"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="1.2"
+                          >
+                            <rect x="2.5" y="5.5" width="7" height="5" rx="0.5" />
+                            <path d="M4 5.5V4a2 2 0 0 1 4 0v1.5" />
+                          </svg>
+                        )}
                         {booking.customerName}
                       </button>
                     ) : (

@@ -67,6 +67,13 @@ model MemberPackage {
   expiresAt      DateTime @map("expires_at") // purchasedAt + packageType.validityDays, computed at creation
   hoursRemaining Int      @map("hours_remaining")
 
+  // Soft "unassign" (§ admin ask): record stays for audit — existing
+  // bookings' memberPackageId references stay valid — but hours are
+  // zeroed and it can no longer be looked up or spent from (see
+  // lib/members/queries.ts, lib/members/checkout.ts).
+  revoked   Boolean   @default(false)
+  revokedAt DateTime? @map("revoked_at")
+
   updatedBy String?  @map("updated_by")
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -92,6 +99,13 @@ model Booking {
   locked        Boolean @default(false)
   gapPolicyFlag Boolean @default(false) @map("gap_policy_flag") // set when §4.5.1 gap policy placed this booking non-ideally
 
+  // Soft-delete / recovery (§ admin "Deleted zone"): cancelledAt is set on
+  // cancel, cleared on restore. needsAttention is set only when a restore
+  // couldn't find a slot at all (distinct from gapPolicyFlag, which means
+  // "fewer contiguous courts than requested," not "none").
+  cancelledAt    DateTime? @map("cancelled_at")
+  needsAttention Boolean   @default(false) @map("needs_attention")
+
   holdExpiresAt DateTime? @map("hold_expires_at")
   amountDue     Int       @map("amount_due") // THB, integer to avoid float rounding
 
@@ -109,4 +123,19 @@ model Booking {
   @@index([date, court])
   @@index([customerId])
   @@map("bookings")
+}
+
+/**
+ * A single settings row for the customer-facing payment QR (§ payment page
+ * redesign — replaces the PromptPay placeholder with a plain image the
+ * admin uploads and can swap at any time). Always read/written at the
+ * fixed id "singleton" — see lib/admin/payment-settings.ts.
+ */
+model PaymentSettings {
+  id         String   @id @default("singleton")
+  qrImageUrl String?  @map("qr_image_url")
+  updatedBy  String?  @map("updated_by")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("payment_settings")
 }

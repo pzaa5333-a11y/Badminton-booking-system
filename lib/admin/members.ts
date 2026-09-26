@@ -8,7 +8,7 @@ export async function listMembers() {
     where: { username: { not: null } },
     include: {
       memberPackages: {
-        where: { expiresAt: { gt: new Date() } },
+        where: { expiresAt: { gt: new Date() }, revoked: false },
         include: { packageType: true },
         orderBy: { expiresAt: "asc" },
       },
@@ -121,6 +121,7 @@ export async function getMemberDetail(id: string) {
       hoursRemaining: p.hoursRemaining,
       purchasedAt: p.purchasedAt.toISOString(),
       expiresAt: p.expiresAt.toISOString(),
+      revoked: p.revoked,
     })),
     bookingsPaidFromPackages: bookings.map((b) => ({
       id: b.id,
@@ -130,4 +131,49 @@ export async function getMemberDetail(id: string) {
       court: b.court,
     })),
   };
+}
+
+/**
+ * Soft "unassign" a package (§ admin ask): the record stays — existing
+ * bookings' memberPackageId references stay valid, and it still shows in
+ * the member's history — but it's marked revoked and zeroed out so it can
+ * no longer be looked up (lib/members/queries.ts) or spent from
+ * (lib/members/checkout.ts). The UI requires a two-click confirm before
+ * calling this, since it's easy to pick the wrong package by mistake.
+ */
+export async function revokePackage(memberPackageId: string, updatedBy: string): Promise<ActionResult> {
+  const pkg = await prisma.memberPackage.findUnique({ where: { id: memberPackageId } });
+  if (!pkg) return { ok: false, error: "Package not found." };
+  if (pkg.revoked) return { ok: false, error: "Already revoked." };
+
+  await prisma.memberPackage.update({
+    where: { id: memberPackageId },
+    data: { revoked: true, revokedAt: new Date(), hoursRemaining: 0, updatedBy },
+  });
+  return { ok: true, data: undefined };
+}
+
+/**
+ * Manually set an active package's remaining hours — for on-site usage
+ * that didn't go through a booking, or a refund/correction. A direct set
+ * rather than a delta: simpler to reason about from the admin UI, and
+ * matches how the rest of the app favors explicit values over deltas.
+ */
+export async function setPackageHours(
+  memberPackageId: string,
+  hoursRemaining: number,
+  updatedBy: string
+): Promise<ActionResult> {
+  if (!Number.isInteger(hoursRemaining) || hoursRemaining < 0) {
+    return { ok: false, error: "Hours must be a non-negative whole number." };
+  }
+  const pkg = await prisma.memberPackage.findUnique({ where: { id: memberPackageId } });
+  if (!pkg) return { ok: false, error: "Package not found." };
+  if (pkg.revoked) return { ok: false, error: "Can't adjust a revoked package." };
+
+  await prisma.memberPackage.update({
+    where: { id: memberPackageId },
+    data: { hoursRemaining, updatedBy },
+  });
+  return { ok: true, data: undefined };
 }

@@ -11,7 +11,7 @@ export async function getMemberSummaryByUsername(username: string) {
     where: { username },
     include: {
       memberPackages: {
-        where: { expiresAt: { gt: new Date() } },
+        where: { expiresAt: { gt: new Date() }, revoked: false },
         include: { packageType: true },
         orderBy: { expiresAt: "asc" },
       },
