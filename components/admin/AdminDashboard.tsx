@@ -9,7 +9,6 @@ import {
   fetchRecentBookings,
   type AdminScheduleBooking,
   type AdminHistoryBooking,
-  type RecentBooking,
 } from "@/lib/client/admin-api";
 import { ScheduleGrid } from "./ScheduleGrid";
 import { BookingActionsPanel } from "./BookingActionsPanel";
@@ -18,8 +17,8 @@ import { HistoryTable } from "./HistoryTable";
 import { MembersTab } from "./MembersTab";
 import { BookingsTab } from "./BookingsTab";
 import { SettingsTab } from "./SettingsTab";
-
-type Tab = "schedule" | "bookings" | "history" | "members" | "settings";
+import { SummaryTab } from "./SummaryTab";
+import { AdminBottomNav, type AdminTab } from "./AdminBottomNav";
 
 const NOTIFICATION_POLL_MS = 10_000;
 const TOAST_LIFETIME_MS = 6_000;
@@ -32,7 +31,7 @@ interface Toast {
 export function AdminDashboard() {
   const router = useRouter();
   const [date, setDate] = useState(() => formatDateISO(new Date()));
-  const [tab, setTab] = useState<Tab>("schedule");
+  const [tab, setTab] = useState<AdminTab>("schedule");
 
   const [schedule, setSchedule] = useState<AdminScheduleBooking[]>([]);
   const [scheduleTick, setScheduleTick] = useState(0);
@@ -41,8 +40,12 @@ export function AdminDashboard() {
   const [showWalkIn, setShowWalkIn] = useState(false);
 
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [unseenCount, setUnseenCount] = useState(0);
-  const lastSeenAtRef = useRef(new Date().toISOString());
+  // Booking ids the admin hasn't looked at yet — drives both the History
+  // nav badge (its count) and the "New" highlight on cards in the
+  // Bookings panel embedded under Schedule (§1.2). A card clears itself
+  // when opened; History clears the whole set when opened.
+  const [unseenIds, setUnseenIds] = useState<Set<string>>(new Set());
+  const lastPolledAtRef = useRef(new Date().toISOString());
 
   useEffect(() => {
     if (tab !== "schedule") return;
@@ -66,20 +69,18 @@ export function AdminDashboard() {
     };
   }, [tab, scheduleTick]);
 
-  // New-booking alerts (§ in-app notifications): poll regardless of which
-  // tab is open, since a booking can land while the admin is looking at
-  // Members or History. Toasts are best-effort feedback; the badge on the
-  // Bookings tab is the durable "you have unseen bookings" signal.
+  // New-booking alerts: poll regardless of which tab is open, since a
+  // booking can land while the admin is looking at Members or Settings.
   useEffect(() => {
     const interval = setInterval(async () => {
-      const since = lastSeenAtRef.current;
-      let recent: RecentBooking[];
+      const since = lastPolledAtRef.current;
+      let recent;
       try {
         recent = await fetchRecentBookings(since);
       } catch {
         return;
       }
-      lastSeenAtRef.current = new Date().toISOString();
+      lastPolledAtRef.current = new Date().toISOString();
       if (recent.length === 0) return;
 
       const newToasts = recent.map((b) => ({
@@ -90,14 +91,27 @@ export function AdminDashboard() {
       newToasts.forEach((toast) => {
         setTimeout(() => setToasts((t) => t.filter((x) => x.id !== toast.id)), TOAST_LIFETIME_MS);
       });
-      if (tab !== "bookings") setUnseenCount((c) => c + recent.length);
+      setUnseenIds((prev) => {
+        const next = new Set(prev);
+        for (const b of recent) next.add(b.id);
+        return next;
+      });
     }, NOTIFICATION_POLL_MS);
     return () => clearInterval(interval);
-  }, [tab]);
+  }, []);
 
-  function selectTab(next: Tab) {
+  function selectTab(next: AdminTab) {
     setTab(next);
-    if (next === "bookings") setUnseenCount(0);
+    if (next === "history") setUnseenIds(new Set());
+  }
+
+  function markSeen(id: string) {
+    setUnseenIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
   }
 
   async function handleLogout() {
@@ -107,62 +121,24 @@ export function AdminDashboard() {
   }
 
   const flagged = schedule.filter((b) => b.gapPolicyFlag);
+  const todayBookings = schedule.length;
+  const todayCourtsUsed = new Set(schedule.flatMap((b) => (b.court === "court6" ? [6] : b.courtNumbers))).size;
+  const todayRevenue = schedule
+    .filter((b) => b.status === "confirmed" || b.status === "paid")
+    .reduce((sum, b) => sum + b.amountDue, 0);
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6">
+    <div className="mx-auto w-full min-w-0 max-w-5xl px-4 pb-24 pt-6">
       <header className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-bold">Sevendays Badminton — Admin</h1>
+        <h1 className="text-xl font-bold text-brand-deep">Sevendays Badminton — Admin</h1>
         <button type="button" onClick={handleLogout} className="text-sm text-neutral-500 underline dark:text-neutral-400">
           Log out
         </button>
       </header>
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="flex rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800">
-          <button
-            type="button"
-            onClick={() => selectTab("schedule")}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${tab === "schedule" ? "bg-white shadow dark:bg-neutral-700" : ""}`}
-          >
-            Schedule
-          </button>
-          <button
-            type="button"
-            onClick={() => selectTab("bookings")}
-            className={`relative rounded-md px-3 py-1.5 text-sm font-medium ${tab === "bookings" ? "bg-white shadow dark:bg-neutral-700" : ""}`}
-          >
-            Bookings
-            {unseenCount > 0 && (
-              <span className="absolute -right-1 -top-1 rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-                {unseenCount}
-              </span>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => selectTab("history")}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${tab === "history" ? "bg-white shadow dark:bg-neutral-700" : ""}`}
-          >
-            History
-          </button>
-          <button
-            type="button"
-            onClick={() => selectTab("members")}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${tab === "members" ? "bg-white shadow dark:bg-neutral-700" : ""}`}
-          >
-            Members
-          </button>
-          <button
-            type="button"
-            onClick={() => selectTab("settings")}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${tab === "settings" ? "bg-white shadow dark:bg-neutral-700" : ""}`}
-          >
-            Settings
-          </button>
-        </div>
-
-        {tab === "schedule" && (
-          <>
+      {tab === "schedule" && (
+        <>
+          <div className="mb-4 flex flex-wrap items-center gap-3">
             <input
               type="date"
               value={date}
@@ -172,38 +148,54 @@ export function AdminDashboard() {
             <button
               type="button"
               onClick={() => setShowWalkIn(true)}
-              className="ml-auto rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white"
+              className="ml-auto rounded-lg bg-brand-sport px-3 py-1.5 text-sm font-semibold text-white"
             >
               + Walk-in
             </button>
-          </>
-        )}
-      </div>
+          </div>
 
-      {tab === "schedule" && (
-        <>
+          <div className="mb-4 grid grid-cols-3 gap-1.5">
+            <div className="min-w-0 rounded-2xl border border-neutral-200 bg-white p-2 text-center shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+              <p className="truncate text-base font-bold text-brand-deep">{todayBookings}</p>
+              <p className="truncate text-[10px] text-neutral-500 dark:text-neutral-400">bookings</p>
+            </div>
+            <div className="min-w-0 rounded-2xl border border-neutral-200 bg-white p-2 text-center shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+              <p className="truncate text-base font-bold text-brand-deep">{todayCourtsUsed}/6</p>
+              <p className="truncate text-[10px] text-neutral-500 dark:text-neutral-400">courts booked</p>
+            </div>
+            <div className="min-w-0 rounded-2xl border border-neutral-200 bg-white p-2 text-center shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+              <p className="truncate text-base font-bold text-brand-deep">฿{todayRevenue}</p>
+              <p className="truncate text-[10px] text-neutral-500 dark:text-neutral-400">revenue</p>
+            </div>
+          </div>
+
           {flagged.length > 0 && (
-            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm dark:border-red-900 dark:bg-red-950">
-              <p className="mb-1 font-semibold text-red-800 dark:text-red-300">Flagged for review (gap policy)</p>
+            <div className="mb-4 rounded-2xl border border-brand-red/30 bg-brand-red/5 p-3 text-sm">
+              <p className="mb-1 font-semibold text-brand-red">Flagged for review (gap policy)</p>
               {flagged.map((b) => (
                 <button
                   key={b.id}
                   type="button"
                   onClick={() => setSelectedBooking(b)}
-                  className="block text-red-700 underline dark:text-red-300"
+                  className="block text-brand-red underline"
                 >
                   {b.customerName} · {String(b.startHour).padStart(2, "0")}:00 · courts {b.courtNumbers.join(", ") || "none"}
                 </button>
               ))}
             </div>
           )}
+
           <ScheduleGrid bookings={schedule} onSelectBooking={setSelectedBooking} />
+
+          <div className="mt-6">
+            <BookingsTab unseenIds={unseenIds} onOpenBooking={markSeen} />
+          </div>
         </>
       )}
 
-      {tab === "bookings" && <BookingsTab />}
+      {tab === "summary" && <SummaryTab />}
 
-      {tab === "history" && <HistoryTable bookings={history} />}
+      {tab === "history" && <HistoryTable bookings={history} onChanged={() => setScheduleTick((t) => t + 1)} />}
 
       {tab === "members" && <MembersTab />}
 
@@ -212,7 +204,7 @@ export function AdminDashboard() {
       {selectedBooking && (
         <BookingActionsPanel
           booking={selectedBooking}
-          otherPoolBookings={schedule.filter((b) => b.court === "pool")}
+          currentDate={date}
           onClose={() => setSelectedBooking(null)}
           onChanged={() => setScheduleTick((t) => t + 1)}
         />
@@ -223,17 +215,16 @@ export function AdminDashboard() {
       )}
 
       {toasts.length > 0 && (
-        <div className="fixed bottom-4 right-4 z-50 space-y-2">
+        <div className="fixed bottom-20 right-4 z-50 space-y-2">
           {toasts.map((toast) => (
-            <div
-              key={toast.id}
-              className="rounded-lg bg-neutral-900 px-4 py-2.5 text-sm text-white shadow-lg dark:bg-white dark:text-neutral-900"
-            >
+            <div key={toast.id} className="rounded-lg bg-brand-deep px-4 py-2.5 text-sm text-white shadow-lg">
               New booking: {toast.text}
             </div>
           ))}
         </div>
       )}
+
+      <AdminBottomNav active={tab} onSelect={selectTab} historyBadgeCount={unseenIds.size} />
     </div>
   );
 }

@@ -165,7 +165,7 @@ export function PaymentPage({ bookingId }: PaymentPageProps) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-md px-4 pt-6 pb-16">
+    <div className="mx-auto w-full min-w-0 max-w-md px-4 pt-6 pb-16">
       <header className="mb-4">
         <h1 className="text-xl font-bold">Complete your booking</h1>
       </header>

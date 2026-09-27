@@ -48,6 +48,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       slipVerificationResult: JSON.stringify(result),
       status: result.verified ? "confirmed" : booking.status,
       paymentMethod: result.verified ? "transfer" : booking.paymentMethod,
+      paymentCheckStatus: result.verified ? "pending" : booking.paymentCheckStatus,
     },
   });
 

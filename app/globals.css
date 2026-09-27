@@ -1,8 +1,18 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #eef4fa;
+  --foreground: #1f2937;
+
+  /* Sevendays brand palette — see plan's design-system foundation.
+     Headings use --brand-deep directly; body text stays neutral dark for
+     readability rather than tinting every paragraph blue. */
+  --brand-deep: #163f78;
+  --brand-sport: #205090;
+  --brand-red: #e13b20;
+  --brand-yellow: #f5c83d;
+  --brand-soft: #eef4fa;
+  --brand-green: #16a85b;
 }
 
 @theme inline {
@@ -10,12 +20,27 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-sport: var(--brand-sport);
+  --color-brand-red: var(--brand-red);
+  --color-brand-yellow: var(--brand-yellow);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-green: var(--brand-green);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+
+    /* Slightly brightened for contrast against a dark background. */
+    --brand-deep: #4d7bc4;
+    --brand-sport: #5b93d6;
+    --brand-red: #f0604a;
+    --brand-yellow: #f5c83d;
+    --brand-soft: #10192b;
+    --brand-green: #2ecc84;
   }
 }
 

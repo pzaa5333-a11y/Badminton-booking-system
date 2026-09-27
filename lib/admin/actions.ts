@@ -1,8 +1,9 @@
 import { prisma } from "@/lib/db";
+import { Prisma } from "@/generated/prisma/client";
 import { placeBooking, repackDate } from "@/lib/allocation/engine";
 import { getPoolBookingsForDate } from "@/lib/bookings/pool";
 import { getCourt6BusyHours } from "@/lib/bookings/court6";
-import { bookingHourWindow, COURT6, HOLD_DURATION_MINUTES, POOL_COURT_NUMBERS } from "@/lib/types";
+import { bookingHourWindow, CLOSING_HOUR, COURT6, HOLD_DURATION_MINUTES, POOL_COURT_NUMBERS } from "@/lib/types";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -40,25 +41,125 @@ export async function cancelBooking(id: string, updatedBy: string): Promise<Acti
   return { ok: true };
 }
 
+function toNumberArray(value: unknown): number[] {
+  return Array.isArray(value) ? (value as number[]) : [];
+}
+
+function windowsOverlap(startA: number, durationA: number, startB: number, durationB: number): boolean {
+  const windowA = bookingHourWindow(startA, durationA);
+  const windowB = bookingHourWindow(startB, durationB);
+  return windowA.some((h) => windowB.includes(h));
+}
+
+const ACTIVE_STATUSES = ["held", "paid", "confirmed"] as const;
+
 /**
- * Manual court override (§6.3): a deliberate staff action, allowed to touch
- * a locked booking too — the UI requires a confirmation step before calling
- * this, since it's an intentional exception to the engine's normal
- * never-move-a-locked-booking guarantee, not something that should happen
- * by accident.
+ * Reassign a booking's date, time and court(s) together in one step (§
+ * admin "Reassign" — replaces the old separate override-courts and
+ * swap-courts controls, which required jumping between screens for what
+ * was really one task). Any *other* active booking that now overlaps the
+ * new slot is left exactly where it is and flagged `needsAttention` for a
+ * human to sort out — reassignment never auto-relocates a booking it
+ * displaces. The original date/time/court(s) are snapshotted the first
+ * time a booking is reassigned (never overwritten by a later
+ * reassignment), so "Revert to original" always means the true original.
  */
-export async function overrideCourtNumbers(id: string, courtNumbers: number[], updatedBy: string): Promise<ActionResult> {
-  if (courtNumbers.some((c) => !(POOL_COURT_NUMBERS as readonly number[]).includes(c))) {
-    return { ok: false, error: "Court numbers must be within 1–5." };
-  }
+export async function reassignBooking(
+  id: string,
+  target: { date: string; startHour: number; durationMinutes: number; courtNumbers: number[] },
+  updatedBy: string
+): Promise<ActionResult> {
   const booking = await prisma.booking.findUnique({ where: { id } });
   if (!booking) return { ok: false, error: "Booking not found" };
-  if (booking.court !== "pool") return { ok: false, error: "Court 6 has no assignment to override." };
+  if (booking.status === "cancelled" || booking.status === "released") {
+    return { ok: false, error: `Booking is already ${booking.status}.` };
+  }
+
+  const window = bookingHourWindow(target.startHour, target.durationMinutes);
+  if (window[window.length - 1] + 1 > CLOSING_HOUR) {
+    return { ok: false, error: "That session runs past closing time." };
+  }
+
+  const courtNumbers = booking.court === "court6" ? [COURT6] : target.courtNumbers;
+  if (booking.court === "pool" && courtNumbers.some((c) => !(POOL_COURT_NUMBERS as readonly number[]).includes(c))) {
+    return { ok: false, error: "Court numbers must be within 1–5." };
+  }
+
+  const others = await prisma.booking.findMany({
+    where: { date: target.date, court: booking.court, status: { in: [...ACTIVE_STATUSES] }, id: { not: id } },
+  });
+  const displaced = others.filter((o) => {
+    if (!windowsOverlap(target.startHour, target.durationMinutes, o.startHour, o.durationMinutes)) return false;
+    if (booking.court === "court6") return true;
+    const otherCourts = toNumberArray(o.courtNumbers);
+    return otherCourts.some((c) => courtNumbers.includes(c));
+  });
+
+  const hasOriginal = booking.originalDate !== null;
+
+  await prisma.$transaction([
+    prisma.booking.update({
+      where: { id },
+      data: {
+        date: target.date,
+        startHour: target.startHour,
+        durationMinutes: target.durationMinutes,
+        courtNumbers,
+        gapPolicyFlag: false,
+        needsAttention: false,
+        updatedBy,
+        ...(hasOriginal
+          ? {}
+          : {
+              originalDate: booking.date,
+              originalStartHour: booking.startHour,
+              originalDurationMinutes: booking.durationMinutes,
+              originalCourtNumbers: booking.courtNumbers ?? [],
+            }),
+      },
+    }),
+    ...displaced.map((o) => prisma.booking.update({ where: { id: o.id }, data: { needsAttention: true, updatedBy } })),
+  ]);
+
+  return { ok: true };
+}
+
+/** Restore a reassigned booking to its true original date/time/court(s)
+ * in one tap (§ admin "Revert to original"). Does not touch whatever it
+ * displaced when it was reassigned — that stays flagged until an admin
+ * resolves or dismisses it separately. */
+export async function revertReassignment(id: string, updatedBy: string): Promise<ActionResult> {
+  const booking = await prisma.booking.findUnique({ where: { id } });
+  if (!booking) return { ok: false, error: "Booking not found" };
+  if (booking.originalDate === null) return { ok: false, error: "This booking hasn't been reassigned." };
 
   await prisma.booking.update({
     where: { id },
-    data: { courtNumbers, gapPolicyFlag: false, updatedBy },
+    data: {
+      date: booking.originalDate,
+      startHour: booking.originalStartHour!,
+      durationMinutes: booking.originalDurationMinutes!,
+      courtNumbers: booking.originalCourtNumbers ?? [],
+      gapPolicyFlag: false,
+      needsAttention: false,
+      originalDate: null,
+      originalStartHour: null,
+      originalDurationMinutes: null,
+      originalCourtNumbers: Prisma.DbNull,
+      updatedBy,
+    },
   });
+  return { ok: true };
+}
+
+/** Clear a `needsAttention` flag once an admin has sorted out a slot a
+ * reassignment displaced (by reassigning or cancelling it themselves) —
+ * the explicit "resolve or dismiss" the marker calls for. */
+export async function dismissNeedsAttention(id: string, updatedBy: string): Promise<ActionResult> {
+  const booking = await prisma.booking.findUnique({ where: { id } });
+  if (!booking) return { ok: false, error: "Booking not found" };
+
+  await prisma.booking.update({ where: { id }, data: { needsAttention: false, updatedBy } });
   return { ok: true };
 }
 
@@ -157,30 +258,15 @@ export async function restoreBooking(id: string, updatedBy: string): Promise<Act
   return { ok: true };
 }
 
-/**
- * Swap two pool bookings' court assignments (§ admin "swap courts"): unlike
- * overrideCourtNumbers, neither booking is overwritten with a blank slate —
- * both keep a valid assignment, just exchanged. Deliberately no repack
- * afterward (same precedent as override: a deliberate manual action bypasses
- * automatic placement), and locked bookings are allowed — the UI requires a
- * confirmation step first when either side is locked.
- */
-export async function swapCourtNumbers(bookingIdA: string, bookingIdB: string, updatedBy: string): Promise<ActionResult> {
-  if (bookingIdA === bookingIdB) return { ok: false, error: "Choose two different bookings." };
+/** Manual slip review (§ admin "Check payment"): flips a slip/bank-transfer
+ * booking from "pending review" to "checked" once staff has compared the
+ * slip against the amount owed. Never meaningful for package/cash
+ * payments — those never get a `paymentCheckStatus` in the first place. */
+export async function markPaymentChecked(id: string, updatedBy: string): Promise<ActionResult> {
+  const booking = await prisma.booking.findUnique({ where: { id } });
+  if (!booking) return { ok: false, error: "Booking not found" };
+  if (booking.paymentCheckStatus === null) return { ok: false, error: "Nothing to check for this booking." };
 
-  const [a, b] = await Promise.all([
-    prisma.booking.findUnique({ where: { id: bookingIdA } }),
-    prisma.booking.findUnique({ where: { id: bookingIdB } }),
-  ]);
-  if (!a || !b) return { ok: false, error: "Booking not found" };
-  if (a.court !== "pool" || b.court !== "pool") return { ok: false, error: "Only courts 1–5 bookings can be swapped." };
-
-  const aCourts = Array.isArray(a.courtNumbers) ? (a.courtNumbers as number[]) : [];
-  const bCourts = Array.isArray(b.courtNumbers) ? (b.courtNumbers as number[]) : [];
-
-  await prisma.$transaction([
-    prisma.booking.update({ where: { id: bookingIdA }, data: { courtNumbers: bCourts, updatedBy } }),
-    prisma.booking.update({ where: { id: bookingIdB }, data: { courtNumbers: aCourts, updatedBy } }),
-  ]);
+  await prisma.booking.update({ where: { id }, data: { paymentCheckStatus: "checked", updatedBy } });
   return { ok: true };
 }

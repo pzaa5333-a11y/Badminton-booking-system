@@ -31,8 +31,10 @@ export interface AdminBookingRow {
   customerPhone: string;
   amountDue: number;
   paymentMethod: string | null;
+  paymentCheckStatus: string | null;
   slipImageUrl: string | null;
   createdAt: string;
+  reassigned: boolean;
 }
 
 export type AdminScheduleBooking = AdminBookingRow;
@@ -116,10 +118,6 @@ export function cancelBooking(id: string) {
   return postAction(`/api/admin/bookings/${id}/cancel`);
 }
 
-export function overrideCourtNumbers(id: string, courtNumbers: number[]) {
-  return postAction(`/api/admin/bookings/${id}/override-courts`, { court_numbers: courtNumbers });
-}
-
 export function markPaid(id: string) {
   return postAction(`/api/admin/bookings/${id}/mark-paid`);
 }
@@ -132,8 +130,27 @@ export function restoreBooking(id: string) {
   return postAction(`/api/admin/bookings/${id}/restore`);
 }
 
-export function swapCourtNumbers(id: string, otherBookingId: string) {
-  return postAction(`/api/admin/bookings/${id}/swap-courts`, { other_booking_id: otherBookingId });
+export interface ReassignPayload {
+  date: string;
+  start_hour: number;
+  duration_minutes: DurationMinutes;
+  court_numbers: number[];
+}
+
+export function reassignBooking(id: string, payload: ReassignPayload) {
+  return postAction(`/api/admin/bookings/${id}/reassign`, payload);
+}
+
+export function revertReassignment(id: string) {
+  return postAction(`/api/admin/bookings/${id}/revert-reassignment`);
+}
+
+export function dismissAttention(id: string) {
+  return postAction(`/api/admin/bookings/${id}/dismiss-attention`);
+}
+
+export function checkPayment(id: string) {
+  return postAction(`/api/admin/bookings/${id}/check-payment`);
 }
 
 // --- Members / packages ---------------------------------------------------
@@ -252,4 +269,26 @@ export async function uploadPaymentQr(file: File): Promise<{ ok: boolean; messag
   const data = await res.json().catch(() => ({}));
   if (!res.ok) return { ok: false, message: data.error ?? "Couldn't upload image." };
   return { ok: true, qrImageUrl: data.qr_image_url };
+}
+
+// --- Summary / analytics ----------------------------------------------------
+
+export interface AdminSummary {
+  revenue: {
+    totalConfirmed: number;
+    totalCancelled: number;
+    byPaymentMethod: { method: string; label: string; amount: number }[];
+  };
+  peak: {
+    heatmap: number[][];
+    busiestHours: { hour: number; count: number }[];
+  };
+  topCustomers: { customerId: string; name: string; sessionCount: number; amountSpent: number }[];
+}
+
+export async function fetchAdminSummary(from: string, to: string): Promise<AdminSummary> {
+  const res = await fetch(`/api/admin/summary?from=${from}&to=${to}`);
+  if (!res.ok) throw new Error("Failed to load summary");
+  const data = await res.json();
+  return { revenue: data.revenue, peak: data.peak, topCustomers: data.top_customers };
 }

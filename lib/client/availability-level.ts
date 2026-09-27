@@ -17,8 +17,8 @@ export const LEVEL_LABEL: Record<AvailabilityLevel, string> = {
 };
 
 export const LEVEL_BAR_CLASS: Record<AvailabilityLevel, string> = {
-  plenty: "bg-emerald-500",
-  filling: "bg-amber-500",
-  last: "bg-orange-500",
+  plenty: "bg-brand-green",
+  filling: "bg-brand-yellow",
+  last: "bg-brand-red",
   full: "bg-neutral-300 dark:bg-neutral-700",
 };

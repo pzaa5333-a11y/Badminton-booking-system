@@ -20,7 +20,15 @@ function shiftMonth(month: string, delta: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-export function BookingsTab() {
+interface BookingsTabProps {
+  /** Ids of bookings the admin hasn't opened yet — cards for these get a
+   * "New" highlight (§1.2) instead of the old badge-dot treatment, since
+   * this panel no longer has its own nav slot to badge. */
+  unseenIds?: Set<string>;
+  onOpenBooking?: (id: string) => void;
+}
+
+export function BookingsTab({ unseenIds, onOpenBooking }: BookingsTabProps) {
   const [month, setMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -54,18 +62,20 @@ export function BookingsTab() {
     return sorted;
   }, [bookings, view, sortKey, sortDir]);
 
-  const otherPoolBookings = selected
-    ? bookings.filter((b) => b.court === "pool" && b.date === selected.date && b.status !== "cancelled")
-    : [];
+  function handleOpen(b: AdminHistoryBooking) {
+    setSelected(b);
+    onOpenBooking?.(b.id);
+  }
 
   return (
     <div>
+      <h2 className="mb-3 text-base font-semibold text-brand-deep">Bookings</h2>
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={() => setMonth((m) => shiftMonth(m, -1))}
-            className="rounded-lg bg-neutral-100 px-2 py-1 text-sm dark:bg-neutral-800"
+            className="rounded-xl bg-neutral-100 px-2 py-1 text-sm dark:bg-neutral-800"
           >
             ←
           </button>
@@ -73,35 +83,35 @@ export function BookingsTab() {
           <button
             type="button"
             onClick={() => setMonth((m) => shiftMonth(m, 1))}
-            className="rounded-lg bg-neutral-100 px-2 py-1 text-sm dark:bg-neutral-800"
+            className="rounded-xl bg-neutral-100 px-2 py-1 text-sm dark:bg-neutral-800"
           >
             →
           </button>
         </div>
 
-        <div className="flex rounded-lg bg-neutral-100 p-1 dark:bg-neutral-800">
+        <div className="flex rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800">
           <button
             type="button"
             onClick={() => setView("active")}
-            className={`rounded-md px-3 py-1 text-sm font-medium ${view === "active" ? "bg-white shadow dark:bg-neutral-700" : ""}`}
+            className={`rounded-lg px-3 py-1 text-sm font-medium ${view === "active" ? "bg-white text-brand-deep shadow dark:bg-neutral-700" : ""}`}
           >
             Active
           </button>
           <button
             type="button"
             onClick={() => setView("deleted")}
-            className={`rounded-md px-3 py-1 text-sm font-medium ${view === "deleted" ? "bg-white shadow dark:bg-neutral-700" : ""}`}
+            className={`rounded-lg px-3 py-1 text-sm font-medium ${view === "deleted" ? "bg-white text-brand-deep shadow dark:bg-neutral-700" : ""}`}
           >
             Deleted zone
           </button>
         </div>
 
         <div className="flex items-center gap-2 text-sm">
-          <label className="text-neutral-500 dark:text-neutral-400">Sort by</label>
+          <label className="text-neutral-500 dark:text-neutral-400">Sort</label>
           <select
             value={sortKey}
             onChange={(e) => setSortKey(e.target.value as SortKey)}
-            className="rounded-lg border border-neutral-300 bg-transparent px-2 py-1 dark:border-neutral-700"
+            className="rounded-xl border border-neutral-300 bg-transparent px-2 py-1 dark:border-neutral-700"
           >
             <option value="createdAt">Booked at</option>
             <option value="date">Session date</option>
@@ -110,9 +120,9 @@ export function BookingsTab() {
           <button
             type="button"
             onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
-            className="rounded-lg bg-neutral-100 px-2 py-1 dark:bg-neutral-800"
+            className="rounded-xl bg-neutral-100 px-2 py-1 dark:bg-neutral-800"
           >
-            {sortDir === "asc" ? "↑ Oldest/A–Z" : "↓ Newest/Z–A"}
+            {sortDir === "asc" ? "↑" : "↓"}
           </button>
         </div>
       </div>
@@ -122,47 +132,73 @@ export function BookingsTab() {
           {view === "deleted" ? "Nothing in the deleted zone this month." : "No bookings this month."}
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-neutral-200 dark:border-neutral-800">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-neutral-50 text-xs text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
-              <tr>
-                <th className="px-3 py-2">Name</th>
-                <th className="px-3 py-2">Court(s)</th>
-                <th className="px-3 py-2">Session</th>
-                <th className="px-3 py-2">Status</th>
-                <th className="px-3 py-2">Payment</th>
-                <th className="px-3 py-2">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((b) => (
-                <tr
-                  key={b.id}
-                  onClick={() => setSelected(b)}
-                  className="cursor-pointer border-t border-neutral-100 hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-900"
-                >
-                  <td className="px-3 py-2">{b.customerName}</td>
-                  <td className="px-3 py-2">{b.court === "court6" ? "Court 6" : `${b.courtCount} court${b.courtCount > 1 ? "s" : ""}`}</td>
-                  <td className="px-3 py-2">
-                    {b.date} · {formatHourLabel(b.startHour)} · {b.durationMinutes / 60}h
-                  </td>
-                  <td className="px-3 py-2">
+        <div className="space-y-2">
+          {rows.map((b) => {
+            const isNew = unseenIds?.has(b.id) ?? false;
+            return (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => handleOpen(b)}
+                className={`block w-full rounded-2xl border p-3 text-left shadow-sm transition-colors ${
+                  isNew
+                    ? "border-brand-yellow bg-brand-yellow/10"
+                    : "border-neutral-200 bg-white hover:bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900 dark:hover:bg-neutral-800"
+                }`}
+              >
+                <div className="mb-1 flex items-center justify-between gap-2">
+                  <span className="font-semibold">{b.customerName}</span>
+                  <div className="flex items-center gap-1.5">
+                    {isNew && (
+                      <span className="rounded-full bg-brand-yellow px-2 py-0.5 text-[10px] font-semibold text-brand-deep">
+                        New
+                      </span>
+                    )}
+                    <span className="text-xs text-neutral-500 dark:text-neutral-400">
+                      Booked {new Date(b.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+                    </span>
+                  </div>
+                </div>
+                <div className="mb-1.5 flex flex-wrap items-center gap-1">
+                  {b.court === "court6" ? (
+                    <span className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand-deep dark:bg-neutral-800">
+                      Court 6
+                    </span>
+                  ) : (
+                    b.courtNumbers.map((c) => (
+                      <span
+                        key={c}
+                        className="rounded-full bg-brand-soft px-2 py-0.5 text-xs font-medium text-brand-deep dark:bg-neutral-800"
+                      >
+                        {c}
+                      </span>
+                    ))
+                  )}
+                  <span className="text-sm text-neutral-600 dark:text-neutral-300">
+                    {b.date} · {formatHourLabel(b.startHour)}–{formatHourLabel(b.startHour + b.durationMinutes / 60)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-neutral-500 dark:text-neutral-400">
                     {b.status}
-                    {b.needsAttention && " (needs attention)"}
-                  </td>
-                  <td className="px-3 py-2">{paymentMethodLabel(b.paymentMethod) ?? "—"}</td>
-                  <td className="px-3 py-2">฿{b.amountDue}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    {b.needsAttention && " · needs review"}
+                    {paymentMethodLabel(b.paymentMethod) && ` · ${paymentMethodLabel(b.paymentMethod)}`}
+                  </span>
+                  <span className="font-semibold">฿{b.amountDue}</span>
+                </div>
+                {view === "deleted" && (
+                  <span className="mt-1.5 inline-block text-xs font-medium text-brand-sport">Tap to restore</span>
+                )}
+              </button>
+            );
+          })}
         </div>
       )}
 
       {selected && (
         <BookingActionsPanel
           booking={selected}
-          otherPoolBookings={otherPoolBookings}
+          currentDate={selected.date}
           onClose={() => setSelected(null)}
           onChanged={() => setTick((t) => t + 1)}
         />

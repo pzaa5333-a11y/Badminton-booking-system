@@ -16,17 +16,9 @@ export function addDays(d: Date, days: number): Date {
 export interface DateChip {
   date: string;
   label: string;
-}
-
-/** Today, Tomorrow, then named weekdays out to 7 days total (§3.2). */
-export function defaultDateStrip(today: Date): DateChip[] {
-  const chips: DateChip[] = [];
-  for (let i = 0; i < 7; i++) {
-    const d = addDays(today, i);
-    const label = i === 0 ? "Today" : i === 1 ? "Tomorrow" : WEEKDAY_LABELS[d.getDay()];
-    chips.push({ date: formatDateISO(d), label });
-  }
-  return chips;
+  /** "Sep 22" — shown beneath `label` (§2.2), so a chip always names both
+   * the relative day and the actual date. */
+  dateLabel: string;
 }
 
 export function formatHourLabel(hour: number): string {
@@ -36,4 +28,23 @@ export function formatHourLabel(hour: number): string {
 export function formatChipLabel(dateISO: string): string {
   const d = new Date(`${dateISO}T00:00:00`);
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+/** Weekday short name for a date outside the default 7-day strip (a
+ * custom date picked via the calendar input). */
+export function formatWeekdayLabel(dateISO: string): string {
+  const d = new Date(`${dateISO}T00:00:00`);
+  return WEEKDAY_LABELS[d.getDay()];
+}
+
+/** Today, Tomorrow, then named weekdays out to 7 days total (§3.2). */
+export function defaultDateStrip(today: Date): DateChip[] {
+  const chips: DateChip[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(today, i);
+    const label = i === 0 ? "Today" : i === 1 ? "Tomorrow" : WEEKDAY_LABELS[d.getDay()];
+    const dateISO = formatDateISO(d);
+    chips.push({ date: dateISO, label, dateLabel: formatChipLabel(dateISO) });
+  }
+  return chips;
 }

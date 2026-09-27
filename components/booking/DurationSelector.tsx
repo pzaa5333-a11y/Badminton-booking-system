@@ -19,10 +19,10 @@ export function DurationSelector({ value, onChange }: DurationSelectorProps) {
             key={d}
             type="button"
             onClick={() => onChange(d)}
-            className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-colors ${
+            className={`flex-1 rounded-2xl py-3 text-base font-bold transition-colors ${
               active
-                ? "bg-emerald-600 text-white"
-                : "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-200"
+                ? "bg-brand-sport text-white shadow-sm"
+                : "bg-brand-soft text-brand-deep dark:bg-neutral-800 dark:text-neutral-200"
             }`}
           >
             {LABELS[d]}

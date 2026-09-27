@@ -31,8 +31,10 @@ export async function getAdminScheduleForDate(date: string, now: Date = new Date
     customerPhone: r.customer.phone,
     amountDue: r.amountDue,
     paymentMethod: r.paymentMethod,
+    paymentCheckStatus: r.paymentCheckStatus,
     slipImageUrl: r.slipImageUrl,
     createdAt: r.createdAt.toISOString(),
+    reassigned: r.originalDate !== null,
   }));
 }
 
@@ -75,10 +77,12 @@ export async function getBookingHistory(
     amountDue: r.amountDue,
     slipImageUrl: r.slipImageUrl,
     paymentMethod: r.paymentMethod,
+    paymentCheckStatus: r.paymentCheckStatus,
     customerName: r.customer.name,
     customerPhone: r.customer.phone,
     createdAt: r.createdAt.toISOString(),
     updatedBy: r.updatedBy,
+    reassigned: r.originalDate !== null,
   }));
 }
 

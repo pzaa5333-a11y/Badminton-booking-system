@@ -17,11 +17,11 @@ function bookingHours(b: AdminScheduleBooking): number[] {
 }
 
 function statusClass(status: string, gapFlag: boolean): string {
-  if (gapFlag) return "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300";
+  if (gapFlag) return "bg-brand-red/10 text-brand-red";
   if (status === "confirmed" || status === "paid") {
-    return "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300";
+    return "bg-brand-green/10 text-brand-green";
   }
-  return "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"; // held
+  return "bg-brand-yellow/25 text-brand-deep"; // held
 }
 
 export function ScheduleGrid({ bookings, onSelectBooking }: ScheduleGridProps) {
@@ -76,6 +76,12 @@ export function ScheduleGrid({ bookings, onSelectBooking }: ScheduleGridProps) {
                             <rect x="2.5" y="5.5" width="7" height="5" rx="0.5" />
                             <path d="M4 5.5V4a2 2 0 0 1 4 0v1.5" />
                           </svg>
+                        )}
+                        {booking.needsAttention && (
+                          <span
+                            className="absolute left-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-brand-yellow"
+                            title="Needs review"
+                          />
                         )}
                         {booking.customerName}
                       </button>

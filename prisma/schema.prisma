@@ -112,9 +112,22 @@ model Booking {
   slipImageUrl           String? @map("slip_image_url")
   slipVerificationResult String? @map("slip_verification_result")
 
+  // Manual payment review (§ admin "Check payment"): only ever set for
+  // slip/bank-transfer payments — package and cash payments have nothing
+  // to check against a slip, so this stays null for them.
+  paymentCheckStatus String? @map("payment_check_status") // null | 'pending' | 'checked'
+
   paymentMethod   String?        @map("payment_method") // 'promptpay' | 'package' | 'cash'
   memberPackage   MemberPackage? @relation(fields: [memberPackageId], references: [id])
   memberPackageId String?        @map("member_package_id") // which package this booking drew hours from, if paid that way
+
+  // Court reassignment (§ admin "Reassign"): captured once, on the first
+  // reassignment only — never overwritten by later ones — so "Revert to
+  // original" always means the true original slot, not just the last one.
+  originalDate            String? @map("original_date")
+  originalStartHour       Int?    @map("original_start_hour")
+  originalDurationMinutes Int?    @map("original_duration_minutes")
+  originalCourtNumbers    Json?   @map("original_court_numbers")
 
   updatedBy String?  @map("updated_by") // admin identifier for manual actions
   createdAt DateTime @default(now()) @map("created_at")
