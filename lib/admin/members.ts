@@ -56,6 +56,14 @@ export async function listPackageTypes() {
   return prisma.packageType.findMany({ where: { active: true }, orderBy: { hours: "asc" } });
 }
 
+/** Includes deactivated types too — for the admin management list, where
+ * a deactivated type still needs to be visible (and reactivatable). The
+ * assignment dropdown keeps using `listPackageTypes()` above, which stays
+ * active-only. */
+export async function listPackageTypesAll() {
+  return prisma.packageType.findMany({ orderBy: { hours: "asc" } });
+}
+
 export async function createPackageType(
   input: { name: string; hours: number; validityDays: number; price?: number }
 ): Promise<ActionResult<{ id: string }>> {
@@ -68,6 +76,38 @@ export async function createPackageType(
     },
   });
   return { ok: true, data: { id: packageType.id } };
+}
+
+export async function updatePackageType(
+  id: string,
+  input: { name?: string; hours?: number; validityDays?: number; price?: number }
+): Promise<ActionResult> {
+  const packageType = await prisma.packageType.findUnique({ where: { id } });
+  if (!packageType) return { ok: false, error: "Package type not found." };
+
+  await prisma.packageType.update({
+    where: { id },
+    data: {
+      name: input.name,
+      hours: input.hours,
+      validityDays: input.validityDays,
+      price: input.price,
+    },
+  });
+  return { ok: true, data: undefined };
+}
+
+/** Soft "delete" (§ admin ask, confirmed: deactivate rather than a hard
+ * delete): existing member packages purchased under this type keep
+ * working exactly as before — only new assignments are affected, since
+ * `listPackageTypes()` (the assignment dropdown's source) filters to
+ * `active: true`. */
+export async function setPackageTypeActive(id: string, active: boolean): Promise<ActionResult> {
+  const packageType = await prisma.packageType.findUnique({ where: { id } });
+  if (!packageType) return { ok: false, error: "Package type not found." };
+
+  await prisma.packageType.update({ where: { id }, data: { active } });
+  return { ok: true, data: undefined };
 }
 
 export async function assignPackage(

@@ -220,19 +220,30 @@ export interface AdminPackageType {
   hours: number;
   validityDays: number;
   price: number | null;
+  active: boolean;
+}
+
+type RawPackageType = { id: string; name: string; hours: number; validityDays: number; price: number | null; active: boolean };
+
+function toAdminPackageType(p: RawPackageType): AdminPackageType {
+  return { id: p.id, name: p.name, hours: p.hours, validityDays: p.validityDays, price: p.price, active: p.active };
 }
 
 export async function fetchPackageTypes(): Promise<AdminPackageType[]> {
   const res = await fetch("/api/admin/package-types");
   if (!res.ok) throw new Error("Failed to load package types");
   const data = await res.json();
-  return data.packageTypes.map((p: { id: string; name: string; hours: number; validityDays: number; price: number | null }) => ({
-    id: p.id,
-    name: p.name,
-    hours: p.hours,
-    validityDays: p.validityDays,
-    price: p.price,
-  }));
+  return data.packageTypes.map(toAdminPackageType);
+}
+
+/** Includes deactivated types — for the admin package-management list
+ * (§ package type management). The assignment dropdown elsewhere keeps
+ * using `fetchPackageTypes()` above, which stays active-only. */
+export async function fetchAllPackageTypes(): Promise<AdminPackageType[]> {
+  const res = await fetch("/api/admin/package-types/all");
+  if (!res.ok) throw new Error("Failed to load package types");
+  const data = await res.json();
+  return data.packageTypes.map(toAdminPackageType);
 }
 
 export async function createPackageType(payload: {
@@ -249,6 +260,24 @@ export async function createPackageType(payload: {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) return { ok: false, message: data.error ?? "Couldn't create package type." };
   return { ok: true };
+}
+
+export async function updatePackageType(
+  id: string,
+  payload: { name?: string; hours?: number; validity_days?: number; price?: number }
+): Promise<{ ok: boolean; message?: string }> {
+  const res = await fetch(`/api/admin/package-types/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) return { ok: false, message: data.error ?? "Couldn't update package type." };
+  return { ok: true };
+}
+
+export function setPackageTypeActive(id: string, active: boolean) {
+  return postAction(`/api/admin/package-types/${id}/active`, { active });
 }
 
 export async function assignPackageToMember(memberId: string, packageTypeId: string) {

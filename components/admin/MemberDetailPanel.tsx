@@ -117,7 +117,7 @@ export function MemberDetailPanel({ memberId, onClose, onChanged }: MemberDetail
                   type="button"
                   disabled={busy || !selectedTypeId}
                   onClick={handleAssign}
-                  className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                  className="rounded-lg bg-brand-sport px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
                 >
                   Assign
                 </button>
@@ -151,7 +151,7 @@ export function MemberDetailPanel({ memberId, onClose, onChanged }: MemberDetail
                         type="button"
                         disabled={busy}
                         onClick={() => handleSaveHours(p.id)}
-                        className="rounded-lg bg-emerald-600 px-2 py-1 text-xs font-semibold text-white disabled:opacity-60"
+                        className="rounded-lg bg-brand-sport px-2 py-1 text-xs font-semibold text-white disabled:opacity-60"
                       >
                         Save
                       </button>

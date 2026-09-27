@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { fetchAdminBookingsForMonth, paymentMethodLabel, type AdminHistoryBooking } from "@/lib/client/admin-api";
+import { fetchAdminBookingsForMonth, fetchAdminHistory, paymentMethodLabel, type AdminHistoryBooking } from "@/lib/client/admin-api";
 import { DISPLAY_LOCALE, formatHourLabel } from "@/lib/client/dates";
 import { BookingActionsPanel } from "./BookingActionsPanel";
 
 type SortKey = "createdAt" | "date" | "name";
 type SortDir = "asc" | "desc";
 type View = "active" | "deleted";
+type Range = "daily" | "monthly";
 
 function monthLabel(month: string): string {
   const [y, m] = month.split("-").map(Number);
@@ -26,9 +27,13 @@ interface BookingsTabProps {
    * this panel no longer has its own nav slot to badge. */
   unseenIds?: Set<string>;
   onOpenBooking?: (id: string) => void;
+  /** The Schedule grid's currently-selected date — Daily view fetches this
+   * exact date so the two stay in sync (§ Daily/Monthly toggle). */
+  date: string;
 }
 
-export function BookingsTab({ unseenIds, onOpenBooking }: BookingsTabProps) {
+export function BookingsTab({ unseenIds, onOpenBooking, date }: BookingsTabProps) {
+  const [range, setRange] = useState<Range>("daily");
   const [month, setMonth] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -42,13 +47,14 @@ export function BookingsTab({ unseenIds, onOpenBooking }: BookingsTabProps) {
 
   useEffect(() => {
     let cancelled = false;
-    fetchAdminBookingsForMonth(month).then((rows) => {
+    const fetchRows = range === "daily" ? fetchAdminHistory(date) : fetchAdminBookingsForMonth(month);
+    fetchRows.then((rows) => {
       if (!cancelled) setBookings(rows);
     });
     return () => {
       cancelled = true;
     };
-  }, [month, tick]);
+  }, [range, date, month, tick]);
 
   const rows = useMemo(() => {
     const filtered = bookings.filter((b) => (view === "deleted" ? b.status === "cancelled" : b.status !== "cancelled"));
@@ -71,23 +77,44 @@ export function BookingsTab({ unseenIds, onOpenBooking }: BookingsTabProps) {
     <div>
       <h2 className="mb-3 text-base font-semibold text-brand-deep">Bookings</h2>
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800">
           <button
             type="button"
-            onClick={() => setMonth((m) => shiftMonth(m, -1))}
-            className="rounded-xl bg-neutral-100 px-2 py-1 text-sm dark:bg-neutral-800"
+            onClick={() => setRange("daily")}
+            className={`rounded-lg px-3 py-1 text-sm font-medium ${range === "daily" ? "bg-white text-brand-deep shadow dark:bg-neutral-700" : ""}`}
           >
-            ←
+            Daily
           </button>
-          <span className="text-sm font-medium">{monthLabel(month)}</span>
           <button
             type="button"
-            onClick={() => setMonth((m) => shiftMonth(m, 1))}
-            className="rounded-xl bg-neutral-100 px-2 py-1 text-sm dark:bg-neutral-800"
+            onClick={() => setRange("monthly")}
+            className={`rounded-lg px-3 py-1 text-sm font-medium ${range === "monthly" ? "bg-white text-brand-deep shadow dark:bg-neutral-700" : ""}`}
           >
-            →
+            Monthly
           </button>
         </div>
+
+        {range === "daily" ? (
+          <span className="text-sm font-medium">{date}</span>
+        ) : (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setMonth((m) => shiftMonth(m, -1))}
+              className="rounded-xl bg-neutral-100 px-2 py-1 text-sm dark:bg-neutral-800"
+            >
+              ←
+            </button>
+            <span className="text-sm font-medium">{monthLabel(month)}</span>
+            <button
+              type="button"
+              onClick={() => setMonth((m) => shiftMonth(m, 1))}
+              className="rounded-xl bg-neutral-100 px-2 py-1 text-sm dark:bg-neutral-800"
+            >
+              →
+            </button>
+          </div>
+        )}
 
         <div className="flex rounded-xl bg-neutral-100 p-1 dark:bg-neutral-800">
           <button
@@ -129,7 +156,9 @@ export function BookingsTab({ unseenIds, onOpenBooking }: BookingsTabProps) {
 
       {rows.length === 0 ? (
         <p className="text-sm text-neutral-500 dark:text-neutral-400">
-          {view === "deleted" ? "Nothing in the deleted zone this month." : "No bookings this month."}
+          {view === "deleted"
+            ? `Nothing in the deleted zone ${range === "daily" ? "today" : "this month"}.`
+            : `No bookings ${range === "daily" ? "today" : "this month"}.`}
         </p>
       ) : (
         <div className="space-y-2">

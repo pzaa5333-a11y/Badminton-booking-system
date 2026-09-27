@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatDateISO, formatHourLabel } from "@/lib/client/dates";
+import { CLOSING_HOUR, OPENING_HOUR } from "@/lib/types";
 import {
   fetchAdminSchedule,
   fetchAdminHistory,
@@ -122,7 +123,15 @@ export function AdminDashboard() {
 
   const flagged = schedule.filter((b) => b.gapPolicyFlag);
   const todayBookings = schedule.length;
-  const todayCourtsUsed = new Set(schedule.flatMap((b) => (b.court === "court6" ? [6] : b.courtNumbers))).size;
+  // Booked court-hours (courts × duration, summed) over the day's total
+  // possible court-hours — replaces the old "distinct courts used / 6"
+  // stat, which didn't reflect that a court can be double-booked across
+  // different hours in the same day (§ capacity stat).
+  const todayCourtHours = schedule.reduce((sum, b) => {
+    const courts = b.court === "court6" ? 1 : b.courtNumbers.length;
+    return sum + courts * (b.durationMinutes / 60);
+  }, 0);
+  const maxCourtHours = 6 * (CLOSING_HOUR - OPENING_HOUR);
   const todayRevenue = schedule
     .filter((b) => b.status === "confirmed" || b.status === "paid")
     .reduce((sum, b) => sum + b.amountDue, 0);
@@ -160,8 +169,10 @@ export function AdminDashboard() {
               <p className="truncate text-[10px] text-neutral-500 dark:text-neutral-400">bookings</p>
             </div>
             <div className="min-w-0 rounded-2xl border border-neutral-200 bg-white p-2 text-center shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-              <p className="truncate text-base font-bold text-brand-deep">{todayCourtsUsed}/6</p>
-              <p className="truncate text-[10px] text-neutral-500 dark:text-neutral-400">courts booked</p>
+              <p className="truncate text-base font-bold text-brand-deep">
+                {todayCourtHours}/{maxCourtHours}
+              </p>
+              <p className="truncate text-[10px] text-neutral-500 dark:text-neutral-400">court-hours booked</p>
             </div>
             <div className="min-w-0 rounded-2xl border border-neutral-200 bg-white p-2 text-center shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
               <p className="truncate text-base font-bold text-brand-deep">฿{todayRevenue}</p>
@@ -203,7 +214,7 @@ export function AdminDashboard() {
           <ScheduleGrid bookings={schedule} onSelectBooking={setSelectedBooking} />
 
           <div className="mt-6">
-            <BookingsTab unseenIds={unseenIds} onOpenBooking={markSeen} />
+            <BookingsTab unseenIds={unseenIds} onOpenBooking={markSeen} date={date} />
           </div>
         </>
       )}

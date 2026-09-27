@@ -1,18 +1,19 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { createPackageType } from "@/lib/client/admin-api";
+import { updatePackageType, type AdminPackageType } from "@/lib/client/admin-api";
 
-interface NewPackageTypeFormProps {
+interface EditPackageTypeFormProps {
+  packageType: AdminPackageType;
   onClose: () => void;
-  onCreated: () => void;
+  onSaved: () => void;
 }
 
-export function NewPackageTypeForm({ onClose, onCreated }: NewPackageTypeFormProps) {
-  const [name, setName] = useState("");
-  const [hours, setHours] = useState(10);
-  const [validityDays, setValidityDays] = useState(30);
-  const [price, setPrice] = useState("");
+export function EditPackageTypeForm({ packageType, onClose, onSaved }: EditPackageTypeFormProps) {
+  const [name, setName] = useState(packageType.name);
+  const [hours, setHours] = useState(packageType.hours);
+  const [validityDays, setValidityDays] = useState(packageType.validityDays);
+  const [price, setPrice] = useState(packageType.price !== null ? String(packageType.price) : "");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -20,7 +21,7 @@ export function NewPackageTypeForm({ onClose, onCreated }: NewPackageTypeFormPro
     e.preventDefault();
     setSubmitting(true);
     setError(null);
-    const result = await createPackageType({
+    const result = await updatePackageType(packageType.id, {
       name,
       hours,
       validity_days: validityDays,
@@ -28,10 +29,10 @@ export function NewPackageTypeForm({ onClose, onCreated }: NewPackageTypeFormPro
     });
     setSubmitting(false);
     if (!result.ok) {
-      setError(result.message ?? "Failed to create package type.");
+      setError(result.message ?? "Failed to update package type.");
       return;
     }
-    onCreated();
+    onSaved();
     onClose();
   }
 
@@ -39,7 +40,7 @@ export function NewPackageTypeForm({ onClose, onCreated }: NewPackageTypeFormPro
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
       <button type="button" aria-label="Close" className="absolute inset-0 bg-black/40" onClick={onClose} />
       <form onSubmit={handleSubmit} className="relative w-full max-w-sm space-y-3 rounded-2xl bg-white p-5 shadow-xl dark:bg-neutral-900">
-        <h2 className="text-lg font-semibold">New package type</h2>
+        <h2 className="text-lg font-semibold">Edit package type</h2>
 
         <input
           required
@@ -88,7 +89,7 @@ export function NewPackageTypeForm({ onClose, onCreated }: NewPackageTypeFormPro
           disabled={submitting}
           className="w-full rounded-lg bg-brand-sport py-2.5 font-semibold text-white disabled:opacity-60"
         >
-          {submitting ? "Creating…" : "Create package type"}
+          {submitting ? "Saving…" : "Save changes"}
         </button>
       </form>
     </div>

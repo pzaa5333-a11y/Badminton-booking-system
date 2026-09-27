@@ -1,9 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchMembers, fetchPackageTypes, type AdminMember, type AdminPackageType } from "@/lib/client/admin-api";
+import {
+  fetchMembers,
+  fetchAllPackageTypes,
+  setPackageTypeActive,
+  type AdminMember,
+  type AdminPackageType,
+} from "@/lib/client/admin-api";
 import { NewMemberForm } from "./NewMemberForm";
 import { NewPackageTypeForm } from "./NewPackageTypeForm";
+import { EditPackageTypeForm } from "./EditPackageTypeForm";
 import { MemberDetailPanel } from "./MemberDetailPanel";
 
 export function MembersTab() {
@@ -12,12 +19,18 @@ export function MembersTab() {
   const [tick, setTick] = useState(0);
   const [showNewMember, setShowNewMember] = useState(false);
   const [showNewPackageType, setShowNewPackageType] = useState(false);
+  const [editingPackageType, setEditingPackageType] = useState<AdminPackageType | null>(null);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchMembers().then(setMembers);
-    fetchPackageTypes().then(setPackageTypes);
+    fetchAllPackageTypes().then(setPackageTypes);
   }, [tick]);
+
+  async function handleToggleActive(pt: AdminPackageType) {
+    await setPackageTypeActive(pt.id, !pt.active);
+    setTick((t) => t + 1);
+  }
 
   return (
     <div>
@@ -25,7 +38,7 @@ export function MembersTab() {
         <button
           type="button"
           onClick={() => setShowNewMember(true)}
-          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white"
+          className="rounded-lg bg-brand-sport px-3 py-1.5 text-sm font-semibold text-white"
         >
           + New member
         </button>
@@ -40,11 +53,44 @@ export function MembersTab() {
 
       <div className="mb-6">
         <h2 className="mb-2 text-sm font-semibold text-neutral-500 dark:text-neutral-400">Package types</h2>
-        <div className="flex flex-wrap gap-2">
-          {packageTypes.map((t) => (
-            <span key={t.id} className="rounded-full bg-neutral-100 px-3 py-1 text-xs dark:bg-neutral-800">
-              {t.name} · {t.hours}h · {t.validityDays}d
-            </span>
+        <div className="space-y-2">
+          {packageTypes.map((pt) => (
+            <div
+              key={pt.id}
+              className={`flex items-center justify-between gap-2 rounded-lg border p-3 text-sm ${
+                pt.active
+                  ? "border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900"
+                  : "border-neutral-200 bg-neutral-50 opacity-60 dark:border-neutral-800 dark:bg-neutral-900"
+              }`}
+            >
+              <div>
+                <span className="font-medium">{pt.name}</span>
+                <span className="ml-2 text-xs text-neutral-500 dark:text-neutral-400">
+                  {pt.hours}h · {pt.validityDays}d{pt.price !== null ? ` · ฿${pt.price}` : ""}
+                  {!pt.active && " · deactivated"}
+                </span>
+              </div>
+              <div className="flex shrink-0 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setEditingPackageType(pt)}
+                  className="rounded-lg bg-neutral-100 px-2.5 py-1 text-xs font-medium dark:bg-neutral-800"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleToggleActive(pt)}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-medium ${
+                    pt.active
+                      ? "bg-brand-red/10 text-brand-red"
+                      : "bg-brand-green/10 text-brand-green"
+                  }`}
+                >
+                  {pt.active ? "Deactivate" : "Reactivate"}
+                </button>
+              </div>
+            </div>
           ))}
           {packageTypes.length === 0 && <p className="text-sm text-neutral-500 dark:text-neutral-400">No package types yet.</p>}
         </div>
@@ -56,7 +102,7 @@ export function MembersTab() {
             key={m.id}
             type="button"
             onClick={() => setSelectedMemberId(m.id)}
-            className="block w-full rounded-lg border border-neutral-200 p-3 text-left text-sm dark:border-neutral-800"
+            className="block w-full rounded-lg border border-neutral-200 bg-white p-3 text-left text-sm shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
           >
             <div className="flex items-center justify-between">
               <span className="font-medium">{m.name}</span>
@@ -77,6 +123,13 @@ export function MembersTab() {
       )}
       {showNewPackageType && (
         <NewPackageTypeForm onClose={() => setShowNewPackageType(false)} onCreated={() => setTick((t) => t + 1)} />
+      )}
+      {editingPackageType && (
+        <EditPackageTypeForm
+          packageType={editingPackageType}
+          onClose={() => setEditingPackageType(null)}
+          onSaved={() => setTick((t) => t + 1)}
+        />
       )}
       {selectedMemberId && (
         <MemberDetailPanel

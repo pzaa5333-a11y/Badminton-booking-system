@@ -19,14 +19,28 @@ function bookingHours(b: AdminScheduleBooking): number[] {
 /** Walk-ins (paid cash, confirmed immediately at the counter) get their
  * own color, distinct from a web booking that's also confirmed (paid
  * online via transfer/package) — so admin can tell at a glance which
- * courts were booked in person vs online, not just what's paid vs not. */
-function statusClass(status: string, gapFlag: boolean, paymentMethod: string | null): string {
-  if (gapFlag) return "bg-brand-red/10 text-brand-red";
+ * courts were booked in person vs online, not just what's paid vs not.
+ *
+ * The customer name itself always renders in a fixed high-contrast color
+ * (see the button's className below) — status is conveyed by the cell's
+ * background tint plus the lock/needs-review icons, which still use this
+ * status color, rather than by the name text color (§ name legibility). */
+function statusBgClass(status: string, gapFlag: boolean, paymentMethod: string | null): string {
+  if (gapFlag) return "bg-brand-red/10";
   if (status === "confirmed" || status === "paid") {
-    if (paymentMethod === "cash") return "bg-brand-sport/10 text-brand-sport";
-    return "bg-brand-green/10 text-brand-green";
+    if (paymentMethod === "cash") return "bg-brand-sport/10";
+    return "bg-brand-green/10";
   }
-  return "bg-brand-yellow/25 text-brand-deep"; // held
+  return "bg-brand-yellow/25"; // held
+}
+
+function statusIconClass(status: string, gapFlag: boolean, paymentMethod: string | null): string {
+  if (gapFlag) return "text-brand-red";
+  if (status === "confirmed" || status === "paid") {
+    if (paymentMethod === "cash") return "text-brand-sport";
+    return "text-brand-green";
+  }
+  return "text-brand-deep"; // held
 }
 
 export function ScheduleGrid({ bookings, onSelectBooking }: ScheduleGridProps) {
@@ -67,13 +81,13 @@ export function ScheduleGrid({ bookings, onSelectBooking }: ScheduleGridProps) {
                       <button
                         type="button"
                         onClick={() => onSelectBooking(booking)}
-                        className={`relative w-16 truncate rounded px-1 py-1.5 text-left ${statusClass(booking.status, booking.gapPolicyFlag, booking.paymentMethod)}`}
+                        className={`relative w-16 truncate rounded px-1 py-1.5 text-left text-neutral-900 dark:text-neutral-100 ${statusBgClass(booking.status, booking.gapPolicyFlag, booking.paymentMethod)}`}
                         title={`${booking.customerName} · ${booking.status}${booking.locked ? " · locked" : ""}`}
                       >
                         {booking.locked && (
                           <svg
                             viewBox="0 0 12 12"
-                            className="absolute right-0.5 top-0.5 h-2.5 w-2.5 opacity-70"
+                            className={`absolute right-0.5 top-0.5 h-2.5 w-2.5 opacity-80 ${statusIconClass(booking.status, booking.gapPolicyFlag, booking.paymentMethod)}`}
                             fill="none"
                             stroke="currentColor"
                             strokeWidth="1.2"

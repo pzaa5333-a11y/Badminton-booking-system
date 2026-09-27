@@ -85,88 +85,94 @@ export function BookingPage() {
   }
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-md px-4 pt-6 pb-24">
-      <header className="mb-6">
-        <h1 className="text-2xl font-bold text-brand-deep">Sevendays Badminton</h1>
-        <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-400">
-          Pick a time, how long, and how many courts — we&apos;ll sort out the rest.
-        </p>
+    <div className="mx-auto w-full min-w-0 max-w-md pt-6 pb-24">
+      <header
+        className="relative mb-6 overflow-hidden bg-[url('/images/hero-bg.webp')] bg-cover bg-bottom px-4 pb-8 pt-2"
+      >
+        <div className="relative z-10 max-w-[65%]">
+          <h1 className="text-3xl font-extrabold leading-tight tracking-tight text-brand-deep">
+            Find your court,
+            <br />
+            play your game.
+          </h1>
+          <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
+            Pick a time, how long, and how many courts — we&apos;ll sort out the rest.
+          </p>
+        </div>
+        <img
+          src="/images/mascot.png"
+          alt=""
+          className="absolute -right-2 top-2 h-28 w-28 object-contain sm:h-32 sm:w-32"
+        />
       </header>
 
-      <div className="mb-3 flex justify-end">
-        <label
-          className="relative flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-brand-deep shadow-sm dark:bg-neutral-800 dark:text-neutral-200"
-          aria-label="Pick a date"
-        >
-          <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.4">
-            <rect x="2" y="3" width="12" height="11" rx="1.5" />
-            <path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3" strokeLinecap="round" />
-          </svg>
-          Pick a date
-          <input
-            type="date"
-            className="absolute inset-0 cursor-pointer opacity-0"
-            onChange={(e) => {
-              if (e.target.value) handlePickCustomDate(e.target.value);
-            }}
-          />
-        </label>
+      <div className="px-4">
+        <div className="mb-3 flex justify-end">
+          <label
+            className="relative flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-brand-deep shadow-sm dark:bg-neutral-800 dark:text-neutral-200"
+            aria-label="Pick a date"
+          >
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.4">
+              <rect x="2" y="3" width="12" height="11" rx="1.5" />
+              <path d="M2 6.5h12M5.5 1.5v3M10.5 1.5v3" strokeLinecap="round" />
+            </svg>
+            Pick a date
+            <input
+              type="date"
+              className="absolute inset-0 cursor-pointer opacity-0"
+              onChange={(e) => {
+                if (e.target.value) handlePickCustomDate(e.target.value);
+              }}
+            />
+          </label>
+        </div>
+
+        <section className="mb-6">
+          <DateStrip chips={chips} selectedDate={selectedDate} onSelect={setSelectedDate} />
+        </section>
+
+        <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm dark:bg-neutral-900">
+          <h2 className="mb-3 flex items-baseline gap-1.5 text-base font-semibold text-brand-deep">
+            Courts 1–5
+            <button type="button" onClick={scrollToCourt6} className="text-xs font-semibold text-brand-sport underline">
+              (Court 6)
+            </button>
+          </h2>
+          <div className="mb-3">
+            <DurationSelector value={duration} onChange={setDuration} />
+          </div>
+          <div className="mb-3">
+            <AvailabilityLegend />
+          </div>
+          {poolErrored && <p className="text-sm text-brand-red">Couldn&apos;t load availability. Try again in a moment.</p>}
+          {!poolErrored && !poolHours && (
+            <div className="space-y-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-11 animate-pulse rounded-lg bg-neutral-100 dark:bg-neutral-800" />
+              ))}
+            </div>
+          )}
+          {poolHours && (
+            <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+              {poolHours.map((h) => (
+                <PoolHourRow key={h.hour} hour={h} date={selectedDate} onSelect={handleSelectPoolHour} />
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section id="court-6" className="mb-6 scroll-mt-4 rounded-2xl bg-white p-4 shadow-sm dark:bg-neutral-900">
+          <h2 className="mb-3 text-base font-semibold text-brand-deep">Court 6</h2>
+          {court6Errored && <p className="text-sm text-brand-red">Couldn&apos;t load Court 6.</p>}
+          {!court6Errored && court6Busy && (
+            <Court6Row busyHours={court6Busy} date={selectedDate} onSelect={handleSelectCourt6Hour} />
+          )}
+        </section>
+
+        <p className="text-xs text-neutral-500 dark:text-neutral-400">
+          Court numbers are assigned automatically when you book. We keep your group&apos;s courts next to each other whenever we can.
+        </p>
       </div>
-
-      <section className="mb-6">
-        <DateStrip chips={chips} selectedDate={selectedDate} onSelect={setSelectedDate} />
-      </section>
-
-      <section className="mb-4 rounded-2xl bg-white p-4 shadow-sm dark:bg-neutral-900">
-        <h2 className="mb-3 text-base font-semibold text-brand-deep">Courts 1–5</h2>
-        <div className="mb-3">
-          <DurationSelector value={duration} onChange={setDuration} />
-        </div>
-        <div className="mb-3">
-          <AvailabilityLegend />
-        </div>
-        {poolErrored && <p className="text-sm text-brand-red">Couldn&apos;t load availability. Try again in a moment.</p>}
-        {!poolErrored && !poolHours && (
-          <div className="space-y-2">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-11 animate-pulse rounded-lg bg-neutral-100 dark:bg-neutral-800" />
-            ))}
-          </div>
-        )}
-        {poolHours && (
-          <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
-            {poolHours.map((h) => (
-              <PoolHourRow key={h.hour} hour={h} date={selectedDate} onSelect={handleSelectPoolHour} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      <button
-        type="button"
-        onClick={scrollToCourt6}
-        className="mb-4 flex w-full items-center justify-between rounded-2xl bg-brand-sport px-4 py-3 text-left text-white shadow-sm"
-      >
-        <span>
-          <span className="block text-sm font-semibold">Want a single court to yourselves?</span>
-          <span className="block text-xs text-white/80">Jump to Court 6 →</span>
-        </span>
-        <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M12 5v14M12 19l-5-5M12 19l5-5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
-      <section id="court-6" className="mb-6 scroll-mt-4 rounded-2xl bg-white p-4 shadow-sm dark:bg-neutral-900">
-        <h2 className="mb-3 text-base font-semibold text-brand-deep">Court 6</h2>
-        {court6Errored && <p className="text-sm text-brand-red">Couldn&apos;t load Court 6.</p>}
-        {!court6Errored && court6Busy && (
-          <Court6Row busyHours={court6Busy} date={selectedDate} onSelect={handleSelectCourt6Hour} />
-        )}
-      </section>
-
-      <p className="text-xs text-neutral-500 dark:text-neutral-400">
-        Court numbers are assigned automatically when you book. We keep your group&apos;s courts next to each other whenever we can.
-      </p>
 
       <RequestSheet
         key={sheetTarget ? `${sheetTarget.court}-${sheetTarget.hour}` : "closed"}

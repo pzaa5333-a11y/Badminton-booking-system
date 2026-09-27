@@ -73,7 +73,7 @@ export function NewMemberForm({ onClose, onCreated }: NewMemberFormProps) {
         <button
           type="submit"
           disabled={submitting}
-          className="w-full rounded-lg bg-emerald-600 py-2.5 font-semibold text-white disabled:opacity-60"
+          className="w-full rounded-lg bg-brand-sport py-2.5 font-semibold text-white disabled:opacity-60"
         >
           {submitting ? "Creating…" : "Create member"}
         </button>
