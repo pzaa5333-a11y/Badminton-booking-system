@@ -185,6 +185,21 @@ export function AdminDashboard() {
             </div>
           )}
 
+          <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-500 dark:text-neutral-400">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-brand-yellow/70" /> Held
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-brand-green" /> Confirmed (online)
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-brand-sport" /> Walk-in (cash)
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-brand-red" /> Flagged
+            </span>
+          </div>
+
           <ScheduleGrid bookings={schedule} onSelectBooking={setSelectedBooking} />
 
           <div className="mt-6">

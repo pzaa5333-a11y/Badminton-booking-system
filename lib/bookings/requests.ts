@@ -25,6 +25,11 @@ export interface BookingRequestInput {
    * immediately, still runs through the same allocation engine. */
   immediate?: boolean;
   updatedBy?: string;
+  /** How to resolve an existing customer record under this phone having a
+   * different name than `customerName` — "keep" (default) leaves it
+   * untouched, "update" overwrites it. Only the admin walk-in flow passes
+   * "update", and only after the admin has explicitly confirmed it. */
+  nameConflict?: "keep" | "update";
 }
 
 export type CreateBookingResult =
@@ -55,7 +60,11 @@ export async function createBookingRequest(input: BookingRequestInput): Promise<
   }
 
   return prisma.$transaction(async (tx) => {
-    const customer = await findOrCreateCustomer({ name: input.customerName, phone: input.customerPhone }, tx);
+    const customer = await findOrCreateCustomer(
+      { name: input.customerName, phone: input.customerPhone },
+      tx,
+      input.nameConflict
+    );
 
     if (input.court === "court6") {
       const busy = new Set(await getCourt6BusyHours(input.date, now, tx));

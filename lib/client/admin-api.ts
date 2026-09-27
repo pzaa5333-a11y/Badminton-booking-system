@@ -90,6 +90,16 @@ export interface WalkInPayload {
   court: CourtSelection;
   customer_name: string;
   customer_phone: string;
+  name_conflict?: "keep" | "update";
+}
+
+/** Pre-check before submitting a walk-in (§ admin name-conflict warning) —
+ * lets the form ask the admin to confirm before silently keeping or
+ * overwriting an existing customer's name. */
+export async function lookupCustomerByPhone(phone: string): Promise<{ found: boolean; name: string | null }> {
+  const res = await fetch(`/api/admin/customers/lookup?phone=${encodeURIComponent(phone)}`);
+  if (!res.ok) throw new Error("Failed to look up customer");
+  return res.json();
 }
 
 export async function createWalkIn(payload: WalkInPayload): Promise<{ ok: boolean; message?: string }> {

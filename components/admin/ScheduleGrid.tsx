@@ -16,9 +16,14 @@ function bookingHours(b: AdminScheduleBooking): number[] {
   return Array.from({ length: hours }, (_, i) => b.startHour + i);
 }
 
-function statusClass(status: string, gapFlag: boolean): string {
+/** Walk-ins (paid cash, confirmed immediately at the counter) get their
+ * own color, distinct from a web booking that's also confirmed (paid
+ * online via transfer/package) — so admin can tell at a glance which
+ * courts were booked in person vs online, not just what's paid vs not. */
+function statusClass(status: string, gapFlag: boolean, paymentMethod: string | null): string {
   if (gapFlag) return "bg-brand-red/10 text-brand-red";
   if (status === "confirmed" || status === "paid") {
+    if (paymentMethod === "cash") return "bg-brand-sport/10 text-brand-sport";
     return "bg-brand-green/10 text-brand-green";
   }
   return "bg-brand-yellow/25 text-brand-deep"; // held
@@ -62,7 +67,7 @@ export function ScheduleGrid({ bookings, onSelectBooking }: ScheduleGridProps) {
                       <button
                         type="button"
                         onClick={() => onSelectBooking(booking)}
-                        className={`relative w-16 truncate rounded px-1 py-1.5 text-left ${statusClass(booking.status, booking.gapPolicyFlag)}`}
+                        className={`relative w-16 truncate rounded px-1 py-1.5 text-left ${statusClass(booking.status, booking.gapPolicyFlag, booking.paymentMethod)}`}
                         title={`${booking.customerName} · ${booking.status}${booking.locked ? " · locked" : ""}`}
                       >
                         {booking.locked && (

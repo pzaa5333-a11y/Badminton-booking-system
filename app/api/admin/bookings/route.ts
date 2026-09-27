@@ -31,6 +31,7 @@ const walkInSchema = z.object({
   court: z.enum(["pool", "court6"]),
   customer_name: nameSchema,
   customer_phone: phoneSchema,
+  name_conflict: z.enum(["keep", "update"]).optional(),
 });
 
 /** Walk-in booking (§6.3): skips Pages 1–2, still runs through the
@@ -53,6 +54,7 @@ export async function POST(request: NextRequest) {
     customerPhone: body.customer_phone,
     immediate: true,
     updatedBy: "admin",
+    nameConflict: body.name_conflict,
   });
 
   if (result.kind === "conflict") {
