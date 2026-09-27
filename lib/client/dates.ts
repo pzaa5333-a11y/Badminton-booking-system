@@ -25,9 +25,16 @@ export function formatHourLabel(hour: number): string {
   return `${String(hour % 24).padStart(2, "0")}:00`;
 }
 
+/** Locale is pinned explicitly (never `undefined`) everywhere in this app
+ * that formats a date/time for display — the server (Node) and a
+ * visitor's browser can resolve different default locales, and
+ * `toLocaleDateString(undefined, ...)` would then render different text
+ * on each, which Next.js flags as a hydration mismatch. */
+export const DISPLAY_LOCALE = "en-US";
+
 export function formatChipLabel(dateISO: string): string {
   const d = new Date(`${dateISO}T00:00:00`);
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return d.toLocaleDateString(DISPLAY_LOCALE, { month: "short", day: "numeric" });
 }
 
 /** Weekday short name for a date outside the default 7-day strip (a

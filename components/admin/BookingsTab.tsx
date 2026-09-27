@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { fetchAdminBookingsForMonth, paymentMethodLabel, type AdminHistoryBooking } from "@/lib/client/admin-api";
-import { formatHourLabel } from "@/lib/client/dates";
+import { DISPLAY_LOCALE, formatHourLabel } from "@/lib/client/dates";
 import { BookingActionsPanel } from "./BookingActionsPanel";
 
 type SortKey = "createdAt" | "date" | "name";
@@ -11,7 +11,7 @@ type View = "active" | "deleted";
 
 function monthLabel(month: string): string {
   const [y, m] = month.split("-").map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: "long", year: "numeric" });
+  return new Date(y, m - 1, 1).toLocaleDateString(DISPLAY_LOCALE, { month: "long", year: "numeric" });
 }
 
 function shiftMonth(month: string, delta: number): string {
@@ -155,7 +155,7 @@ export function BookingsTab({ unseenIds, onOpenBooking }: BookingsTabProps) {
                       </span>
                     )}
                     <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                      Booked {new Date(b.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+                      Booked {new Date(b.createdAt).toLocaleDateString(DISPLAY_LOCALE, { day: "numeric", month: "short" })}
                     </span>
                   </div>
                 </div>

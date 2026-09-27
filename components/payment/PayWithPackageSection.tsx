@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { fetchMemberSummary, payWithPackage, type MemberSummary } from "@/lib/client/api";
+import { DISPLAY_LOCALE } from "@/lib/client/dates";
 import { BookingSummaryCard } from "./BookingSummaryCard";
 
 interface BookingSummaryForConfirm {
@@ -151,7 +152,8 @@ export function PayWithPackageSection({ bookingId, summary, onPaid }: PayWithPac
             <div className="mb-3 space-y-1">
               {memberSummary.packages.map((p) => (
                 <p key={p.id} className="text-xs text-neutral-500 dark:text-neutral-400">
-                  {p.packageTypeName}: {p.hoursRemaining}h remaining, expires {new Date(p.expiresAt).toLocaleDateString()}
+                  {p.packageTypeName}: {p.hoursRemaining}h remaining, expires{" "}
+                  {new Date(p.expiresAt).toLocaleDateString(DISPLAY_LOCALE)}
                 </p>
               ))}
             </div>

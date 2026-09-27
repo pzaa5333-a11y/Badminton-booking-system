@@ -12,7 +12,7 @@ import {
   paymentMethodLabel,
   type AdminBookingRow,
 } from "@/lib/client/admin-api";
-import { formatHourLabel } from "@/lib/client/dates";
+import { DISPLAY_LOCALE, formatHourLabel } from "@/lib/client/dates";
 import { ReassignBookingModal } from "./ReassignBookingModal";
 
 interface BookingActionsPanelProps {
@@ -99,7 +99,7 @@ export function BookingActionsPanel({ booking, currentDate, onClose, onChanged }
         )}
 
         <div className="mb-4 divide-y divide-neutral-100 rounded-xl border border-neutral-200 px-3 dark:divide-neutral-800 dark:border-neutral-800">
-          <DetailRow label="Booked at" value={new Date(booking.createdAt).toLocaleString()} />
+          <DetailRow label="Booked at" value={new Date(booking.createdAt).toLocaleString(DISPLAY_LOCALE)} />
           <DetailRow
             label="Session"
             value={`${booking.date ?? currentDate} · ${formatHourLabel(booking.startHour)}–${formatHourLabel(
@@ -108,7 +108,9 @@ export function BookingActionsPanel({ booking, currentDate, onClose, onChanged }
           />
           <DetailRow label="Court" value={courtLabel} />
           <DetailRow label="Customer" value={`${booking.customerName} · ${booking.customerPhone}`} />
-          {booking.cancelledAt && <DetailRow label="Cancelled" value={new Date(booking.cancelledAt).toLocaleString()} />}
+          {booking.cancelledAt && (
+            <DetailRow label="Cancelled" value={new Date(booking.cancelledAt).toLocaleString(DISPLAY_LOCALE)} />
+          )}
         </div>
 
         {error && <p className="mb-3 text-sm text-brand-red">{error}</p>}

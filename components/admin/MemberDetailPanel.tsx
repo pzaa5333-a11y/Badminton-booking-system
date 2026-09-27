@@ -10,7 +10,7 @@ import {
   type AdminMemberDetail,
   type AdminPackageType,
 } from "@/lib/client/admin-api";
-import { formatHourLabel } from "@/lib/client/dates";
+import { DISPLAY_LOCALE, formatHourLabel } from "@/lib/client/dates";
 
 interface MemberDetailPanelProps {
   memberId: string;
@@ -145,7 +145,7 @@ export function MemberDetailPanel({ memberId, onClose, onChanged }: MemberDetail
                         className="w-20 rounded-lg border border-neutral-300 bg-transparent px-2 py-1 text-xs dark:border-neutral-700"
                       />
                       <span className="text-xs text-neutral-500 dark:text-neutral-400">
-                        h remaining · expires {new Date(p.expiresAt).toLocaleDateString()}
+                        h remaining · expires {new Date(p.expiresAt).toLocaleDateString(DISPLAY_LOCALE)}
                       </span>
                       <button
                         type="button"
@@ -165,7 +165,7 @@ export function MemberDetailPanel({ memberId, onClose, onChanged }: MemberDetail
                     </div>
                   ) : (
                     <p className="text-xs text-neutral-500 dark:text-neutral-400">
-                      {p.hoursRemaining}h remaining · expires {new Date(p.expiresAt).toLocaleDateString()}
+                      {p.hoursRemaining}h remaining · expires {new Date(p.expiresAt).toLocaleDateString(DISPLAY_LOCALE)}
                     </p>
                   )}
 

@@ -22,7 +22,11 @@ export async function getRevenueBreakdown(from: string, to: string): Promise<Rev
 
   let totalConfirmed = 0;
   let totalCancelled = 0;
-  const byMethod = new Map<string, number>();
+  // Grouped by *label*, not the raw paymentMethod value — "transfer" and
+  // the legacy "promptpay" value both display as "Bank Transfer", and
+  // should sum into one bar rather than appear as two (which also
+  // produced a duplicate React key, since both mapped to the same label).
+  const byLabel = new Map<string, number>();
 
   for (const r of rows) {
     if (r.status === "cancelled") {
@@ -30,12 +34,12 @@ export async function getRevenueBreakdown(from: string, to: string): Promise<Rev
       continue;
     }
     totalConfirmed += r.amountDue;
-    const key = r.paymentMethod ?? "unknown";
-    byMethod.set(key, (byMethod.get(key) ?? 0) + r.amountDue);
+    const label = METHOD_LABELS[r.paymentMethod ?? "unknown"] ?? r.paymentMethod ?? "Unknown";
+    byLabel.set(label, (byLabel.get(label) ?? 0) + r.amountDue);
   }
 
-  const byPaymentMethod = [...byMethod.entries()]
-    .map(([method, amount]) => ({ method, label: METHOD_LABELS[method] ?? method, amount }))
+  const byPaymentMethod = [...byLabel.entries()]
+    .map(([label, amount]) => ({ method: label, label, amount }))
     .sort((a, b) => b.amount - a.amount);
 
   return { totalConfirmed, totalCancelled, byPaymentMethod };
